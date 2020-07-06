@@ -365,11 +365,13 @@ VALID_USERNAME_PASSWORD_PAIRS = {
 }
 
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.COSMO])
-server = app.server
+
 auth = dash_auth.BasicAuth(
     app,
     VALID_USERNAME_PASSWORD_PAIRS
 )
+
+server = app.server
 
 
 def input_component(label, id, value, step):
