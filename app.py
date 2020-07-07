@@ -345,16 +345,25 @@ def run_simulation(manager_estimates):
     npv_string = str(round(percent_above_zero,4))+'%'
     npv_string = 'Percent positive: ' + npv_string
 
-    columns = ['year0', 'year1', 'year2', 'year3', 'year4', 'year5']
+    columns = ['year 0', 'year 1', 'year 2', 'year 3', 'year 4', 'year 5']
 
-    hist = go.Figure(go.Histogram(x=npvs))
-    hist.update_layout(title='Simulated NPV Histogram')
+    hist = go.Figure(go.Histogram(x=npvs,histnorm='probability'))
+    hist.update_layout(title={'text':"Simulated NPV Histogram",
+                              'y':0.85,
+                              'x':0.5,
+                              'xanchor': 'center',
+                              'yanchor': 'top'})
     hist.update_xaxes(title='NPV')
 
     scatter = go.Figure(go.Scatter(x=columns, y=median, name='Median NPV'))
     scatter.add_trace(go.Scatter(x=columns, y=bottom_25, name='25% NPV'))
     scatter.add_trace(go.Scatter(x=columns, y=top_75, name='75% NPV'))
-    scatter.update_layout(title='FCF Over Time for NPV Quartiles')
+    scatter.update_layout(title={
+        'text': 'YoY FCF for NPV Quartiles',
+        'y':0.85,
+        'x':0.45,
+        'xanchor': 'center',
+        'yanchor': 'top'})
     scatter.update_yaxes(title='FCF')
     return mult, multiple_string, invest, investment_string, year3, year3_string, npv_mean, npv_string, hist, scatter, mult_color, invest_color, year3_color, npv_color
 
@@ -394,99 +403,91 @@ app.layout = dbc.Tabs([
     dbc.Container([
         dbc.Row([html.H1('Monte Carlo Simulation: 1All Media')], justify='center'),
         dbc.Row([
-            dbc.Col([
+            dbc.CardDeck([
                    dbc.Card(
                         id="first-card",
                         children=[
                         dbc.CardHeader(['Yearly Market Growth'],style={'fontWeight':'bold'}),
                         dbc.Container([
+                                    html.P(''),
                                     input_component('min','mkt_growth_min',distribution_dict['mkt_growth'][1][0],.0001),
                                     input_component('mode','mkt_growth_mode',distribution_dict['mkt_growth'][1][1],.0001),
                                     input_component('max','mkt_growth_max',distribution_dict['mkt_growth'][1][2],.0001)
-                                   ])])
-                ]),
-            dbc.Col([
+                                   ])]),
                     dbc.Card([
                             dbc.CardHeader(['Year 5 Market Takeup'],style={'fontWeight':'bold'}),
                         dbc.Container([
+                            html.P(''),
                             input_component('min', 'mkt_takeup_min', distribution_dict['mkt_takeup'][1][0], .001),
                             input_component('mode', 'mkt_takeup_mode', distribution_dict['mkt_takeup'][1][1], .001),
                             input_component('max', 'mkt_takeup_max', distribution_dict['mkt_takeup'][1][2], .001)
-                        ])])
-                ]),
-            dbc.Col([
+                        ])]),
                     dbc.Card([
                             dbc.CardHeader(['Year 5 1All Mkt Share'],style={'fontWeight':'bold'}),
                         dbc.Container([
+                            html.P(''),
                             input_component('min', 'mkt_share_min', distribution_dict['share'][1][0], .001),
                             input_component('mode', 'mkt_share_mode', distribution_dict['share'][1][1], .001),
                             input_component('max', 'mkt_share_max', distribution_dict['share'][1][2], .001)
-                        ])])
-                ]),
-            dbc.Col([
+                        ])]),
                     dbc.Card([
                             dbc.CardHeader(['Growth Factor'],style={'fontWeight':'bold'}),
                         dbc.Container([
+                            html.P(''),
                             input_component('min', 'gf_min', distribution_dict['growth_factor'][1][0], .001),
                             input_component('mode', 'gf_mode', distribution_dict['growth_factor'][1][1], .001),
                             input_component('max', 'gf_max', distribution_dict['growth_factor'][1][2], .001)
-                        ])])
-                ]),
-            dbc.Col([
+                        ])]),
                     dbc.Card([
                             dbc.CardHeader(['Referral Rate'],style={'fontWeight':'bold'}),
                         dbc.Container([
+                            html.P(''),
                             input_component('min', 'ref_rate_min', distribution_dict['ref_rates'][1][0], .001),
                             input_component('mode', 'ref_rate_mode', distribution_dict['ref_rates'][1][1], .001),
                             input_component('max', 'ref_rate_max', distribution_dict['ref_rates'][1][2], .001)
-                        ])])
-                ]),
-            ],justify='center'),
+                        ])]),
+            ])],justify='center'),
+        dbc.Row([html.P('')]),
         dbc.Row([
-            dbc.Col([
+            dbc.CardDeck([
                     dbc.Card([
                         dbc.CardHeader(['Churn Rate'],style={'fontWeight':'bold'}),
                         dbc.Container([
+                            html.P(''),
                             input_component('min', 'churn_rate_min', distribution_dict['churn_rates'][1][0], .001),
                             input_component('mode', 'churn_rate_mode', distribution_dict['churn_rates'][1][1], .001),
                             input_component('max', 'churn_rate_max', distribution_dict['churn_rates'][1][2], .001)
-                        ])])
-                ]),
-            dbc.Col([
+                        ])]),
                     dbc.Card([
                         dbc.CardHeader(['Average Margin per User'],style={'fontWeight':'bold'}),
                         dbc.Container([
+                            html.P(''),
                             input_component('min', 'margin_min', distribution_dict['margins'][1][0], .001),
                             input_component('mode', 'margin_mode', distribution_dict['margins'][1][1], .001),
                             input_component('max', 'margin_max', distribution_dict['margins'][1][2], .001)
-                        ])])
-                ]),
-            dbc.Col([
+                        ])]),
                     dbc.Card([
                         dbc.CardHeader(['Aquisition Expenses'],style={'fontWeight':'bold'}),
                         dbc.Container([
+                            html.P(''),
                             input_component('mean', 'aq_exp_mean', distribution_dict['aquisition_expenses'][1][0], .001),
                             input_component('std', 'aq_exp_std', distribution_dict['aquisition_expenses'][1][1], .001),
-                        ])])
-                ]),
-            dbc.Col([
+                        ])]),
                     dbc.Card([
                         dbc.CardHeader(['Aquisition Capital'],style={'fontWeight':'bold'}),
                         dbc.Container([
                             input_component('mean', 'aq_cap_mean', distribution_dict['aquisition_capital'][1][0], .001),
                             input_component('std', 'aq_cap_std', distribution_dict['aquisition_capital'][1][1], .001),
-                        ])])
-                ]),
-            dbc.Col([
+                        ])]),
                     dbc.Card([
                         dbc.CardHeader(['Fixed Cost Increase'],style={'fontWeight':'bold'}),
                         dbc.Container([
                             input_component('min', 'fc_min', distribution_dict['fixed_cost_increases'][1][0], .001),
                             input_component('mode', 'fc_mode', distribution_dict['fixed_cost_increases'][1][1], .001),
                             input_component('max', 'fc_max', distribution_dict['fixed_cost_increases'][1][2], .001)
-                        ])])
-                ]),
-            ]),
+                        ])]),
+            ])]),
+        dbc.Row([html.P('')]),
         dbc.Row([
             dbc.Col([
                             dbc.Button(
@@ -505,6 +506,7 @@ app.layout = dbc.Tabs([
         ],justify='center'),
         dbc.Container([
             dbc.Row([
+
                 dbc.Col(children=[
                     dcc.Graph(
                         id="hist",
@@ -520,10 +522,11 @@ app.layout = dbc.Tabs([
                         figure=scatter
                     )
                 ])
-            ])]),
+            ], no_gutters=True)]),
+    dbc.Container([dbc.Row([html.H5('Card turns green if key metric average meets goal, red if not')])]),
     dbc.Container([
         dbc.Row([
-            dbc.Col([
+            dbc.CardDeck([
                 dbc.Card(id="mult_card",children=[
                 dbc.CardBody([
                         html.H3("Five Year Multiple of Investment",  style={'fontWeight':'bold'}),
@@ -534,9 +537,7 @@ app.layout = dbc.Tabs([
                            multiple_string]
                         )
                     ])
-                ],color=mult_color, inverse=True)
-            ]),
-            dbc.Col([
+                ],color=mult_color, inverse=True),
                 dbc.Card(id="npv_card", children=[
                     dbc.CardBody(
                         [
@@ -549,8 +550,6 @@ app.layout = dbc.Tabs([
                             )
                         ])
                     ], color=npv_color, inverse=True),
-                ]),
-            dbc.Col([
                 dbc.Card(id="invest_card", children=[
                     dbc.CardBody(
                         [
@@ -562,9 +561,7 @@ app.layout = dbc.Tabs([
                                 investment_string]
                             )
                         ])
-                    ],color=invest_color, inverse=True)
-            ]),
-            dbc.Col([
+                    ],color=invest_color, inverse=True),
                 dbc.Card(id="year3_card", children=[
                     dbc.CardBody(
                         [
@@ -577,10 +574,10 @@ app.layout = dbc.Tabs([
                             )
                         ])
                 ], color=year3_color, inverse=True),
-            ]),
-        ])])
-
-    ], label='Output', tab_id='tab-2')], id='tabs', active_tab='tab-1')
+        ])]),
+    ]),
+    dbc.Row([html.P('')])
+], label='Output', tab_id='tab-2')], id='tabs', active_tab='tab-1')
 
 
 @app.callback(
