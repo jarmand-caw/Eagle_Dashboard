@@ -476,12 +476,14 @@ app.layout = dbc.Tabs([
                     dbc.Card([
                         dbc.CardHeader(['Aquisition Capital'],style={'fontWeight':'bold'}),
                         dbc.Container([
+                            html.P(''),
                             input_component('mean', 'aq_cap_mean', distribution_dict['aquisition_capital'][1][0], .001),
                             input_component('std', 'aq_cap_std', distribution_dict['aquisition_capital'][1][1], .001),
                         ])]),
                     dbc.Card([
                         dbc.CardHeader(['Fixed Cost Increase'],style={'fontWeight':'bold'}),
                         dbc.Container([
+                            html.P(''),
                             input_component('min', 'fc_min', distribution_dict['fixed_cost_increases'][1][0], .001),
                             input_component('mode', 'fc_mode', distribution_dict['fixed_cost_increases'][1][1], .001),
                             input_component('max', 'fc_max', distribution_dict['fixed_cost_increases'][1][2], .001)
