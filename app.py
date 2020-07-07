@@ -632,7 +632,7 @@ app.layout = dbc.Tabs([
                   State('fc_max', 'value')
               ]
             )
-def update_output(xx,a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,aa,bb):
+def update_output(n_clicks,a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,aa,bb):
     list_of_values = [a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,aa,bb]
     distribution_dict = create_dist_dict_from_list(list_of_values)
     print(distribution_dict)
@@ -642,9 +642,12 @@ def update_output(xx,a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,aa,bb):
         dists.append(Distribution(*statistics))
 
     manager_estimates = dict(zip(list(distribution_dict.keys()), dists))
-
+    if n_clicks is not None:
+        active_tab='tab-2'
+    else:
+        active_tab='tab-1'
     mult, multiple_string, invest, investment_string, year3, year3_string, npv_mean, npv_string, hist, scatter, mult_color, invest_color, year3_color, npv_color = run_simulation(manager_estimates)
-    return mult, multiple_string, invest, investment_string, year3, year3_string, npv_mean, npv_string, hist, scatter, 'tab-2', mult_color, invest_color, year3_color, npv_color
+    return mult, multiple_string, invest, investment_string, year3, year3_string, npv_mean, npv_string, hist, scatter, active_tab, mult_color, invest_color, year3_color, npv_color
 
 if __name__ == '__main__':
     app.run_server(debug=True)
