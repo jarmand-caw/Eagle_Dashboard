@@ -2,375 +2,211 @@ import dash
 import dash_core_components as dcc
 import dash_html_components as html
 import plotly.graph_objects as go
+import dash_table
+import dash_table.FormatTemplate as FormatTemplate
 import pandas as pd
 import dash_bootstrap_components as dbc
 from dash.dependencies import Input, Output, State
 import dash_auth
 import numpy as np
 import warnings
+from sklearn.linear_model import LinearRegression
+
 warnings.simplefilter('ignore')
 
-def PERT(low,mode,high,size):
-    return np.random.triangular(low,mode,high,size)
 
-stats = {
-    'adressable_market':130000,
-    'base_line_gc':np.array([.01,.05,.15,.45,.75,1]),
-    'initial_fixed_cost':750,
-    'upfront_investment':7500
-}
+def find_target_rate(power_capacity, growth_curve='conservative'):
+    assert growth_curve in ['standard', 'conservative'], 'Invalid growth curve option'
+    if growth_curve == 'conservative':
+        if power_capacity < 2200:
+            return 0.49
+        if power_capacity > 20000:
+            return 0.4
+        else:
+            return 0.5011 - (.09 / 17800) * power_capacity
+    if growth_curve == 'standard':
+        if power_capacity < 2200:
+            return 0.65
+        if power_capacity > 20000:
+            return 0.51
+        else:
+            return 0.6673 - (.14 / 17800) * power_capacity
 
-class Distribution:
-    """
-    Note: Stats is a list. Important that items are placed in correct order, otherwise its possible an error will be
-    thrown and results will certainly be off
-    Note: Order is always: low, mode, high or mean, std
-    """
-    def __init__(self, name, stats):
-        if name=='triangular':
-            assert len(stats)==3, 'Wrong number of arguments for triangular dist'
-            self.name = name
-            self.lower = stats[0]
-            self.mode = stats[1]
-            self.upper = stats[2]
-        elif name=='pert':
-            assert len(stats) == 3, 'Wrong number of arguments for pert dist'
-            self.name = name
-            self.lower = stats[0]
-            self.mode = stats[1]
-            self.upper = stats[2]
-        elif name=='normal':
-            assert len(stats)==2, 'Wrong number of arguments for normal dist'
-            self.name = name
-            self.mean = stats[0]
-            self.std = stats[1]
-        elif name=='uniform':
-            assert len(stats)==2, 'Wrong number of arguments for uniform dist'
-            self.name = name
-            self.lower = stats[0]
-            self.upper = stats[1]
-    def get_list(self):
-        if self.name=='triangular' or self.name=='pert':
-            return [self.lower,self.mode,self.upper]
-        elif self.name=='normal':
-            return [self.mean,self.std]
-        elif self.name=='uniform':
-            return [self.lower,self.upper]
-    def generate(self, size):
-        if self.name == 'triangular':
-            return np.random.triangular(*self.get_list(), size)
-        elif self.name == 'pert':
-            return PERT(*self.get_list(),size)
-        elif self.name == 'normal':
-            return np.random.normal(*self.get_list(), size)
-        elif self.name == 'uniform':
-            return np.random.uniform(*self.get_list(), size)
 
-#step1: simulate year 5 customers
-distribution_dict = {
-    'mkt_growth':['pert',[.01,.02,.03]],
-    'mkt_takeup':['pert',[.4,.5,.6]],
-    'share':['pert',[.2,.3,.6]],
-    'growth_factor':['triangular',[.9,1,1.1]],
-    'ref_rates':['pert',[.25,.4,.65]],
-    'churn_rates':['pert',[.3,.5,.7]],
-    'margins':['pert',[3.5,4.5,5.5]],
-    'aquisition_expenses':['normal',[1.75,.15]],
-    'aquisition_capital':['normal',[1.75,.15]],
-    'fixed_cost_increases':['pert',[.06,.10,.16]]
-}
-def create_dist_dict_from_list(list_of_values):
-    d = {
-    'mkt_growth':['pert',list_of_values[:3]],
-    'mkt_takeup':['pert',list_of_values[3:6]],
-    'share':['pert',list_of_values[6:9]],
-    'growth_factor':['triangular',list_of_values[9:12]],
-    'ref_rates':['pert',list_of_values[12:15]],
-    'churn_rates':['pert',list_of_values[15:18]],
-    'margins':['pert',list_of_values[18:21]],
-    'aquisition_expenses':['normal',list_of_values[21:23]],
-    'aquisition_capital':['normal',list_of_values[23:25]],
-    'fixed_cost_increases':['pert',list_of_values[25:28]]
-    }
-    return d
-list_of_values = [.01,.02,.03, .4,.5,.6, .2,.3,.6, .9,1,1.1, .25,.4,.65, .3,.5,.7, 3.5,4.5,5.5, 1.75,.15, 1.75,.15, .06,.10,.16]
-distribution_dict = create_dist_dict_from_list(list_of_values)
-dists = []
-for statistics in list(distribution_dict.values()):
-    dists.append(Distribution(*statistics))
+class DataCenter:
+    def __init__(self, power_capacity, sqft, estimate_percent=True, year_5_percent=None, growth_curve='conservative',
+                 starting_capacity=0, offset=0, utility_kw_hr_rate=0.13, rent_per_sqft=31, usage_rate=0.7, monthly_revenue_per_kw=160):
+        if estimate_percent == True:
+            assert growth_curve in ['conservative', 'standard'], 'Invalid growth curve choice'
+            self.goal_percent = find_target_rate(power_capacity, growth_curve)
+        else:
+            assert year_5_percent is not None, 'Must enter year_5_percent if using estimate_percent=False'
+            self.goal_percent = year_5_percent
 
-manager_estimates = dict(zip(list(distribution_dict.keys()),dists))
+        self.offset = offset
 
-class MonteCarlo:
-    def __init__(self):
-        pass
-    def simulate_npv(self, manager_estimates, stats):
-        target_market_size = stats['adressable_market']
+        self.power_capacity = power_capacity
+        self.square_footage = sqft
+        self.starting_capacity = starting_capacity
+        self.estimate_percent = estimate_percent
 
-        mkt_growths = manager_estimates['mkt_growth'].generate(6)
+        # Revenue
+        self.monthly_rate_per_cabinet = 600
+        self.monthly_kw_per_cabinet = 5
 
-        mkt_growths[0] = ((1 + mkt_growths[0]) ** .5) - 1
+        self.cabinet_capacity = self.power_capacity / self.monthly_kw_per_cabinet
 
-        target_market = target_market_size
-        for year in range(6):
-            target_market = target_market * (1 + mkt_growths[year])
+        self.monthly_per_kw_rate = monthly_revenue_per_kw
+        self.monthly_cross_connect_per_cab = 250
+        self.revenue_per_install = 2500
+        self.professional_percent_colo = 0.02
 
-        mkt_takeup = manager_estimates['mkt_takeup'].generate(1)[0]
+        # Costs
+        self.rent_per_sqft = rent_per_sqft
+        self.sqft_per_kw = 9.6
+        self.utilities_kw_hr_rate = utility_kw_hr_rate
+        self.hours_in_quarter = 24 * 365 / 4
+        self.usage_percent = usage_rate
+        self.monthly_maintenance = 1000
+        self.monthly_rm = 2000
+        self.property_tax_percent_of_rent = 0.011
+        self.cross_connect_monthly_cost = 50
+        self.conduit_monthly_cost = 50
+        self.sga_minimum = 167490
 
-        share = manager_estimates['share'].generate(1)[0]
+    def log(self):
+        if self.starting_capacity > 0:
+            if self.estimate_percent == True:
+                sum = 0
+                for x in np.arange(1, 22):
+                    sum += np.log(x)
+                coef = (self.goal_percent - 21 * 8 / 600) / sum
+                self.coef = coef
+                news = []
+                for x in np.arange(1, 22):
+                    news.append(self.coef * np.log(x) + 8 / 600)
+                cum_percent = 0
+                for i in range(len(news)):
+                    cum_percent += news[i]
+                    if cum_percent > self.starting_capacity:
+                        break
+                shift_x = i
+                final_news = []
+                for x in np.arange(1, 22):
+                    final_news.append(self.coef * np.log(x + shift_x) + 8 / 600)
+                self.quarterly_new_percents = np.array(final_news)
+            elif self.estimate_percent == False:
+                sum = 0
+                for x in np.arange(1, 22):
+                    sum += np.log(x)
+                goal_percent = self.goal_percent - self.starting_capacity
+                coef = (goal_percent - 21 * 8 / 600) / sum
+                self.coef = coef
+                news = []
+                for x in np.arange(1, 22):
+                    news.append(self.coef * np.log(x) + 8 / 600)
+                self.quarterly_new_percents = np.array(news)
+        else:
+            sum = 0
+            for x in np.arange(1, 22):
+                sum += np.log(x)
+            goal_percent = self.goal_percent - self.starting_capacity
+            coef = (goal_percent - 21 * 8 / 600) / sum
+            self.coef = coef
+            news = []
+            for x in np.arange(1, 22):
+                news.append(self.coef * np.log(x) + 8 / 600)
+            self.quarterly_new_percents = np.array(news)
+        self.quarterly_new_cabinets = self.quarterly_new_percents * self.cabinet_capacity
+        return self.quarterly_new_percents
 
-        customers = target_market * mkt_takeup * share
+    def quarterly_effective(self):
+        change_cabs = self.quarterly_new_cabinets
+        print(change_cabs)
+        for x in [5, 9, 13, 17]:
+            change_cabs[x] = change_cabs[x] - 1
+        print(change_cabs)
+        cum = np.cumsum(change_cabs)
+        skip = np.cumsum(change_cabs)
+        skip = list(skip)
+        skip.insert(0, 0)
+        skip = skip[:-1]
+        skip = np.array(skip)
+        qe = (skip + cum) / 2
+        qe = np.array([round(x, 0) for x in list(qe)])
+        if self.starting_capacity > 0:
+            qe = qe + self.cabinet_capacity * self.starting_capacity
+        self.quarterly_effective_cabinets = qe
+        return self.quarterly_effective_cabinets
 
-        baseline = stats['base_line_gc']
-        factor = manager_estimates['growth_factor'].generate(1)[0]
+    def get_financial_information(self):
+        # all revenues quarterly
+        self.space_revenue = self.monthly_rate_per_cabinet * 3 * self.quarterly_effective_cabinets
+        self.power_revenue = self.monthly_kw_per_cabinet * self.monthly_per_kw_rate * 3 * self.quarterly_effective_cabinets
+        self.cross_connect_revenue = self.monthly_cross_connect_per_cab * 3 * self.quarterly_effective_cabinets
+        self.install_revenue = self.revenue_per_install * np.array(
+            [round(x, 0) for x in list(self.quarterly_new_cabinets)])
+        self.professional_service_revenue = self.professional_percent_colo * self.space_revenue
+        self.total_revenue = self.space_revenue + self.power_revenue + self.cross_connect_revenue + self.install_revenue + \
+                             self.professional_service_revenue
 
-        curve = baseline*factor
+        # all costs quarterly
+        self.rent_cost = self.square_footage * self.rent_per_sqft / 4
+        self.utilities = self.utilities_kw_hr_rate * self.hours_in_quarter * self.usage_percent * self.quarterly_effective_cabinets
+        self.maintenance = self.monthly_maintenance * 3
+        self.rm = self.monthly_rm * 3
+        self.property_tax = self.property_tax_percent_of_rent * self.rent_cost
+        self.cross_connect_expense = self.cross_connect_monthly_cost * 3 * self.quarterly_effective_cabinets
+        self.conduit_expense = self.conduit_monthly_cost * 3 * self.quarterly_effective_cabinets
+        self.total_direct_costs = self.rent_cost + self.utilities + self.maintenance + self.rm + self.property_tax + self.cross_connect_expense + \
+                                  self.conduit_expense
 
-        curve[5] = 1
-
-        net_per_year = curve*customers
-
-        yearly_ref_rates = manager_estimates['ref_rates'].generate(5)
-
-        yearly_churn_rates = manager_estimates['churn_rates'].generate(6)
-
-        yearly_churns = [] #len should be 6 at end
-        yearly_refs = [] #len should be 6 at end
-        yearly_refs.append(0)
-        for idx in range(5):
-            yearly_refs.append(yearly_ref_rates[idx]*net_per_year[idx])
-
-        yearly_churns.append(-1*(yearly_churn_rates[0] / 2) * net_per_year[0])
-        for idx in range(5):
-            yearly_churns.append(-1*yearly_churn_rates[idx+1]*net_per_year[idx])
-
-        yearly_churns = np.array(yearly_churns)
-        yearly_refs = np.array(yearly_refs)
-        prev_year = list(net_per_year[:-1])
-        prev_year.insert(0,0)
-        net_per_year = np.array(net_per_year)
-        prev_year = np.array(prev_year)
-
-        gross_additions = net_per_year-prev_year-yearly_churns-yearly_refs
-
-        margins = manager_estimates['margins'].generate(6)
-        margins[0] = margins[0]/2
-
-        units_for_margin = list(net_per_year)
-        units_for_margin.insert(0,gross_additions[0])
-        gross_margins = []
-        for i in range(6):
-            avg_u = (units_for_margin[i]+units_for_margin[i+1])/2
-            gross_margins.append(avg_u*margins[i])
-
-        aq_exps = manager_estimates['aquisition_expenses'].generate(6)
-
-        total_aq_exps = aq_exps*gross_additions
-
-        aq_caps = manager_estimates['aquisition_capital'].generate(6)
-
-        total_aq_caps = aq_caps * gross_additions
-
-        oi = np.array(gross_margins)-total_aq_exps
-        self.oi = oi
-        self.total_aq_exps = total_aq_exps
-        self.gross_margins = np.array(gross_margins)
-
-        taxes = oi*.2
-
-        fcf_part1 = oi-taxes-total_aq_caps
-
-        fixed_cost_increases = manager_estimates['fixed_cost_increases'].generate(5)
-        fixed_costs = []
-        f1 = stats['initial_fixed_cost']
-        for inc in fixed_cost_increases:
-            f1 = f1*(1+inc)
-            fixed_costs.append(f1)
-        fixed_costs.insert(0,stats['initial_fixed_cost'])
-
-        fcf = fcf_part1-np.array(fixed_costs)
-        self.fcf = fcf
-
-        npv = 0
-        for i in range(6):
-            npv+=fcf[i]/((1.2)**i)
-        npv = npv-7500
-
-        cumulative_investment = []
-        running_total = 0
-        for idx in range(6):
-            one = fcf[idx]
-            running_total+=one
-            cumulative_investment.append(running_total)
-        cumulative_investment = np.array(cumulative_investment)
-
-        required_investment = cumulative_investment.min()
-
-        total_investment = required_investment-stats['upfront_investment']
-        self.total_investment = total_investment
-
-        self.multiple = -1*(fcf[-1]/self.total_investment)
-        return npv
-
-def run_simulation(manager_estimates):
-    npvs = []
-    fcfs = []
-    ois = []
-    exps = []
-    margins = []
-    total_investment = []
-    multiples = []
-
-    mc1 = MonteCarlo()
-    for i in range(10000):
-        npv = mc1.simulate_npv(manager_estimates, stats)
-        fcf = mc1.fcf
-        oi = mc1.oi
-        ti = mc1.total_investment
-        margin = mc1.gross_margins
-        aq_exp = mc1.total_aq_exps
-        mult = mc1.multiple
-
-        multiples.append(mult)
-        total_investment.append(ti)
-        margins.append(margin)
-        exps.append(aq_exp)
-        ois.append(oi)
-        npvs.append(npv)
-        fcfs.append(fcf)
-    npvs = np.array(npvs)
-    print('Mean:',npvs.mean())
-    print('Std:',npvs.std())
-
-    columns = ['year0','year1','year2','year3','year4','year5']
-    df = pd.DataFrame(np.array(fcfs))
-    df.columns = columns
-    df['npv'] = npvs
-
-    df = df.sort_values('npv')
-    bottom_25 = df[columns].iloc[2499]
-    median = df[columns].iloc[4999]
-    top_75 = df[columns].iloc[7499]
-
-    multiples = np.array(multiples)
-    mult = multiples.mean()
-    mult_color="danger"
-    if mult>3:
-        mult_color="success"
-    mult =  'Average: '+str(round(mult,2))
-    multiples = list(multiples)
-    multiples.sort()
-    def locate_mult3(multiples):
-        for i,x in enumerate(multiples):
-            if x<3:
-                continue
+        self.gross_profit = self.total_revenue - self.total_direct_costs
+        opex = []
+        for x in self.total_revenue:
+            if x * 0.2 > self.sga_minimum:
+                opex.append(x * 0.2)
             else:
-                if i == 0:
-                    return 0
-                else:
-                    return i - 1
-    idx = locate_mult3(multiples)
-    percent_above_3 = (idx/len(multiples))*100
-    multiple_string = str(round(100-percent_above_3,4))+'%'
-    multiple_string = 'Percent over 3.0: '+multiple_string
+                opex.append(self.sga_minimum)
+        self.operating_expenses = np.array(opex)
+        self.ebitda = self.gross_profit - self.operating_expenses
 
-    investment = np.array(total_investment)
-    invest = investment.mean()
-    invest_color = "danger"
+        self.df = pd.DataFrame({
+            'New Cabinets': [round(x, 0) for x in list(self.quarterly_new_cabinets)],
+            'Quarterly Effective Cabinets': list(self.quarterly_effective_cabinets),
+            'Total Revenue': list(self.total_revenue),
+            'Total Costs': list(self.total_direct_costs),
+            'OPEX': list(self.operating_expenses),
+            'EBITDA': list(self.ebitda)
+        }).transpose()
+        return self.df
 
-    if invest>-13500:
-        invest_color="success"
+    def offset_for_addition(self):
+        offset = self.offset
+        a = np.zeros([len(self.df), 21])
+        projected = self.df.values
+        projected = projected[:, :21 - offset]
+        a[:, offset:] = projected
+        self.offset_array = a
+        return self.offset_array
 
-    invest = 'Average: '+str(round(-1*invest,0))
-    investment = list(investment)
-    investment.sort()
-
-    def locate_over_maxinv(investment):
-        for i,x in enumerate(investment):
-            if x<-13500:
-                continue
-            else:
-                if i == 0:
-                    return 0
-                else:
-                    return i - 1
-    idx = locate_over_maxinv(investment)
-    percent_over = (idx/len(investment))*100
-    investment_string = str(round(100-percent_over,4))+'%'
-    investment_string = 'Percent under 13.5M: '+investment_string
+    def get_all_for_addition(self):
+        self.log()
+        self.quarterly_effective()
+        self.get_financial_information()
+        self.offset_for_addition()
+        return self.offset_array
 
 
-    fcf_year3 = np.array(fcfs)[:,3]
-    year3 = fcf_year3.mean()
-    year3_color = "danger"
-    if year3>0:
-        year3_color="success"
-    year3 = 'Average: ' + str(round(year3,0))
-
-    fcf_year3 = list(fcf_year3)
-    fcf_year3.sort()
-
-    def locate_neg(fcfs):
-        for i,x in enumerate(fcfs):
-            if x <0:
-                continue
-            else:
-                if i == 0:
-                    return 0
-                else:
-                    return i - 1
-    idx = locate_neg(fcf_year3)
-    percent_under = (idx/len(fcf_year3))*100
-    year3_string = str(round(100-percent_under,4))+'%'
-    year3_string = 'Percent positive: ' + year3_string
-
-
-    npv_mean = np.array(npvs).mean()
-    npv_color="danger"
-    if npv_mean>0:
-        npv_color="success"
-    npv_mean = 'Average: '+str(round(npv_mean,0))
-    npvs.sort()
-    def locate_zero(npvs):
-        for i,x in enumerate(npvs):
-            if x<0:
-                continue
-            else:
-                if i==0:
-                    return 0
-                else:
-                    return i-1
-    idx = locate_zero(npvs)
-    percent_above_zero = (1-(idx/len(npvs)))*100
-    npv_string = str(round(percent_above_zero,4))+'%'
-    npv_string = 'Percent positive: ' + npv_string
-
-    columns = ['year 0', 'year 1', 'year 2', 'year 3', 'year 4', 'year 5']
-
-    hist = go.Figure(go.Histogram(x=npvs,histnorm='probability'))
-    hist.update_layout(title={'text':"Simulated NPV Histogram",
-                              'y':0.85,
-                              'x':0.5,
-                              'xanchor': 'center',
-                              'yanchor': 'top'})
-    hist.update_xaxes(title='NPV')
-
-    scatter = go.Figure(go.Scatter(x=columns, y=median, name='Median NPV'))
-    scatter.add_trace(go.Scatter(x=columns, y=bottom_25, name='25% NPV'))
-    scatter.add_trace(go.Scatter(x=columns, y=top_75, name='75% NPV'))
-    scatter.update_layout(title={
-        'text': 'YoY FCF for NPV Quartiles',
-        'y':0.85,
-        'x':0.45,
-        'xanchor': 'center',
-        'yanchor': 'top'})
-    scatter.update_yaxes(title='FCF')
-    return mult, multiple_string, invest, investment_string, year3, year3_string, npv_mean, npv_string, hist, scatter, mult_color, invest_color, year3_color, npv_color
-
-mult, multiple_string, invest, investment_string, year3, year3_string, npv_mean, npv_string, hist, scatter, mult_color, invest_color, year3_color, npv_color = run_simulation(manager_estimates)
+dc1 = DataCenter(3000, 27871, estimate_percent=True, starting_capacity=0)
+dc1.log()
+dc1.quarterly_effective()
+dc1.get_financial_information()
+pd.DataFrame(dc1.offset_for_addition())
+final_df = dc1.get_financial_information()
 
 VALID_USERNAME_PASSWORD_PAIRS = {
-    '1all': 'jbk'
+    'HawkWoodGroup': 'project_eagle'
 }
 
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.COSMO])
@@ -381,273 +217,824 @@ auth = dash_auth.BasicAuth(
 )
 
 server = app.server
+quarters = []
+for x in range(20):
+    if x % 4 == 0:
+        quarter = 'Q1'
+    if x % 4 == 1:
+        quarter = 'Q2'
+    if x % 4 == 2:
+        quarter = 'Q3'
+    if x % 4 == 3:
+        quarter = 'Q4'
+    year = str(x // 4 + 2021)
+    quarters.append(year + '-' + quarter)
+quarters.insert(0, '2020-Q4')
+
+final_df.columns = quarters
+
+quarter_dropdown_options = []
+for x in range(len(quarters)):
+    quarter_dropdown_options.append({"label": quarters[x], "value": x})
+quarter_dropdown_options.insert(0,{"label":'None selected', "value":None})
+
+data_centers = dict(zip(list(np.arange(1,11)),[None for x in range(10)]))
+data_centers[1] = dc1
 
 
-def input_component(label, id, value, step):
-    components = dbc.FormGroup([
-            dbc.Label(label, width=5,align='center'),
-        dbc.Col(
-            dbc.Input(
-            type='number',
-            id = id,
-            value = value,
-            max=1e10,
-            min=-1e10,
-            step=step,
-            persistence=True,
-            persistence_type='session'
-    ), width=7)], row=True)
-    return components
-app.layout = dbc.Tabs([
-    dbc.Tab([
-    dbc.Container([
-        dbc.Row([html.H1('Monte Carlo Simulation: 1All Media')], justify='center'),
-        dbc.Row([
-            dbc.CardDeck([
-                   dbc.Card(
-                        id="first-card",
-                        children=[
-                        dbc.CardHeader(['Yearly Market Growth'],style={'fontWeight':'bold'}),
-                        dbc.Container([
-                                    html.P(''),
-                                    input_component('min','mkt_growth_min',distribution_dict['mkt_growth'][1][0],.0001),
-                                    input_component('mode','mkt_growth_mode',distribution_dict['mkt_growth'][1][1],.0001),
-                                    input_component('max','mkt_growth_max',distribution_dict['mkt_growth'][1][2],.0001)
-                                   ])]),
-                    dbc.Card([
-                            dbc.CardHeader(['Year 5 Market Takeup'],style={'fontWeight':'bold'}),
-                        dbc.Container([
-                            html.P(''),
-                            input_component('min', 'mkt_takeup_min', distribution_dict['mkt_takeup'][1][0], .001),
-                            input_component('mode', 'mkt_takeup_mode', distribution_dict['mkt_takeup'][1][1], .001),
-                            input_component('max', 'mkt_takeup_max', distribution_dict['mkt_takeup'][1][2], .001)
-                        ])]),
-                    dbc.Card([
-                            dbc.CardHeader(['Year 5 1All Mkt Share'],style={'fontWeight':'bold'}),
-                        dbc.Container([
-                            html.P(''),
-                            input_component('min', 'mkt_share_min', distribution_dict['share'][1][0], .001),
-                            input_component('mode', 'mkt_share_mode', distribution_dict['share'][1][1], .001),
-                            input_component('max', 'mkt_share_max', distribution_dict['share'][1][2], .001)
-                        ])]),
-                    dbc.Card([
-                            dbc.CardHeader(['Growth Factor'],style={'fontWeight':'bold'}),
-                        dbc.Container([
-                            html.P(''),
-                            input_component('min', 'gf_min', distribution_dict['growth_factor'][1][0], .001),
-                            input_component('mode', 'gf_mode', distribution_dict['growth_factor'][1][1], .001),
-                            input_component('max', 'gf_max', distribution_dict['growth_factor'][1][2], .001)
-                        ])]),
-                    dbc.Card([
-                            dbc.CardHeader(['Referral Rate'],style={'fontWeight':'bold'}),
-                        dbc.Container([
-                            html.P(''),
-                            input_component('min', 'ref_rate_min', distribution_dict['ref_rates'][1][0], .001),
-                            input_component('mode', 'ref_rate_mode', distribution_dict['ref_rates'][1][1], .001),
-                            input_component('max', 'ref_rate_max', distribution_dict['ref_rates'][1][2], .001)
-                        ])]),
-            ])],justify='center'),
-        dbc.Row([html.P('')]),
-        dbc.Row([
-            dbc.CardDeck([
-                    dbc.Card([
-                        dbc.CardHeader(['Churn Rate'],style={'fontWeight':'bold'}),
-                        dbc.Container([
-                            html.P(''),
-                            input_component('min', 'churn_rate_min', distribution_dict['churn_rates'][1][0], .001),
-                            input_component('mode', 'churn_rate_mode', distribution_dict['churn_rates'][1][1], .001),
-                            input_component('max', 'churn_rate_max', distribution_dict['churn_rates'][1][2], .001)
-                        ])]),
-                    dbc.Card([
-                        dbc.CardHeader(['Average Margin per User'],style={'fontWeight':'bold'}),
-                        dbc.Container([
-                            html.P(''),
-                            input_component('min', 'margin_min', distribution_dict['margins'][1][0], .001),
-                            input_component('mode', 'margin_mode', distribution_dict['margins'][1][1], .001),
-                            input_component('max', 'margin_max', distribution_dict['margins'][1][2], .001)
-                        ])]),
-                    dbc.Card([
-                        dbc.CardHeader(['Aquisition Expenses'],style={'fontWeight':'bold'}),
-                        dbc.Container([
-                            html.P(''),
-                            input_component('mean', 'aq_exp_mean', distribution_dict['aquisition_expenses'][1][0], .001),
-                            input_component('std', 'aq_exp_std', distribution_dict['aquisition_expenses'][1][1], .001),
-                        ])]),
-                    dbc.Card([
-                        dbc.CardHeader(['Aquisition Capital'],style={'fontWeight':'bold'}),
-                        dbc.Container([
-                            html.P(''),
-                            input_component('mean', 'aq_cap_mean', distribution_dict['aquisition_capital'][1][0], .001),
-                            input_component('std', 'aq_cap_std', distribution_dict['aquisition_capital'][1][1], .001),
-                        ])]),
-                    dbc.Card([
-                        dbc.CardHeader(['Fixed Cost Increase'],style={'fontWeight':'bold'}),
-                        dbc.Container([
-                            html.P(''),
-                            input_component('min', 'fc_min', distribution_dict['fixed_cost_increases'][1][0], .001),
-                            input_component('mode', 'fc_mode', distribution_dict['fixed_cost_increases'][1][1], .001),
-                            input_component('max', 'fc_max', distribution_dict['fixed_cost_increases'][1][2], .001)
-                        ])]),
-            ])]),
-        dbc.Row([html.P('')]),
-        dbc.Row([
-            dbc.Col([
-                            dbc.Button(
-                                "Submit",
-                                block=True,
-                                id="submit_button",
-                            ),
-                    ])]),
-    ])],label='Input', tab_id='tab-1'),
-    dbc.Tab([
-        dbc.Row([
-            html.H1('Results')
-        ],justify='center'),
-        dbc.Row([
-            html.H3('All NPV, Investment and FCF numbers in thousands (000)')
-        ],justify='center'),
-        dbc.Container([
-            dbc.Row([
 
-                dbc.Col(children=[
-                    dcc.Graph(
-                        id="hist",
-                        animate=False,
-                        config={'responsive':True},
-                        figure=hist
-                    )
-                ]),
-                dbc.Col(children=[
-                    dcc.Graph(
-                        id="scatter",
-                        animate=False,
-                        figure=scatter
+def create_input_group(number, disabled,visible):
+    a = html.Div([
+        dbc.Card([
+        dbc.CardHeader('Datacenter ' + str(number + 1)),
+        dbc.Col([
+            dbc.Container([
+                dbc.FormGroup([
+                    dbc.Label('Select Quarter'),
+                    dbc.Select(options=quarter_dropdown_options, value=None, disabled=disabled, id='select_'+str(number))
+                ])
+            ])
+        ]),
+        dbc.Col([
+            dbc.Container([
+                dbc.FormGroup([
+                    dbc.Label('Power Capacity (kw)'),
+                    dbc.Input(
+                        placeholder='3000',
+                        type='number',
+                        id='power_capacity_' + str(number),
+                        persistence=True,
+                        persistence_type='session',
+                        disabled=disabled,
+                        value=3000
                     )
                 ])
-            ], no_gutters=True)]),
-    dbc.Container([dbc.Row([html.H5('Card turns green if key metric average meets goal, red if not')])]),
-    dbc.Container([
-        dbc.Row([
-            dbc.CardDeck([
-                dbc.Card(id="mult_card",children=[
-                dbc.CardBody([
-                        html.H3("Five Year Multiple of Investment",  style={'fontWeight':'bold'}),
-                        html.H5(id='mult', children=[
-                           mult]
-                        ),
-                        html.H5(id='multiple_string', children=[
-                           multiple_string]
-                        )
+            ])
+        ]),
+        dbc.Col([
+            dbc.Container([
+                dbc.FormGroup([
+                    dbc.Label('Square Footage'),
+                    dbc.Input(
+                        placeholder='27,871',
+                        type='number',
+                        id='sqft_' + str(number),
+                        persistence=True,
+                        persistence_type='session',
+                        disabled=disabled,
+                        value=27971
+                    )
+                ])
+            ])
+        ]),
+        dbc.Col([
+            dbc.Container([
+                dbc.FormGroup([
+                    dbc.Label('Percent of Capacity Filled Currently'),
+                    dbc.Input(
+                        placeholder='0%',
+                        type='number',
+                        id='current_percent_' + str(number),
+                        persistence=True,
+                        persistence_type='session',
+                        disabled=disabled,
+                        value=0
+                    )
+                ])
+            ])
+        ]),
+        dbc.Col([
+            dbc.Container([
+                dbc.FormGroup([
+                    dbc.Label('Growth Curve'),
+                    dbc.RadioItems(
+                        options=[
+                            {"label": "Conservative", "value": 'conservative', "disabled": disabled},
+                            {"label": "Standard", "value": 'standard', "disabled": disabled}
+                        ],
+                        value='conservative',
+                        id='growth_curve_' + str(number),
+                        persistence=True,
+                        persistence_type='session',
+                    )
+                ])
+            ])
+        ]),
+        dbc.Col([
+            dbc.Container([
+                dbc.Button('Advanced Options', color='secondary', disabled=disabled, block=True, id='advanced_'+str(number))
+            ]),
+            dbc.Collapse([
+                dbc.Col([
+                    dbc.Container([
+                        dbc.FormGroup([
+                            dbc.Label('Utility cost per kw/hr'),
+                            dbc.Input(
+                                placeholder='$0.13',
+                                type='number',
+                                id='utility_' + str(number),
+                                persistence=True,
+                                persistence_type='session',
+                                disabled=disabled,
+                                value=0.13
+                            )
+                        ])
                     ])
-                ],color=mult_color, inverse=True),
-                dbc.Card(id="npv_card", children=[
-                    dbc.CardBody(
-                        [
-                            html.H3("Average NPV",  style={'fontWeight':'bold'}),
-                            html.H5(id='npv_mean',children=[
-                                npv_mean]
-                            ),
-                            html.H5(id='npv_string',children=[
-                                npv_string]
+                ]),
+                dbc.Col([
+                    dbc.Container([
+                        dbc.FormGroup([
+                            dbc.Label('Rent per sqft'),
+                            dbc.Input(
+                                placeholder='31',
+                                type='number',
+                                id='rent_' + str(number),
+                                persistence=True,
+                                persistence_type='session',
+                                disabled=disabled,
+                                value=31
                             )
                         ])
-                    ], color=npv_color, inverse=True),
-                dbc.Card(id="invest_card", children=[
-                    dbc.CardBody(
-                        [
-                            html.H3("Total Investment", style={'fontWeight':'bold'}),
-                            html.H5(id='invest', children=[
-                                invest]
-                            ),
-                            html.H5(id='investment_string', children=[
-                                investment_string]
+                    ])
+                ]),
+                dbc.Col([
+                    dbc.Container([
+                        dbc.FormGroup([
+                            dbc.Label('Usage Rate'),
+                            dbc.Input(
+                                placeholder='0.7',
+                                type='number',
+                                id='usage_' + str(number),
+                                persistence=True,
+                                persistence_type='session',
+                                disabled=disabled,
+                                value=0.7
                             )
                         ])
-                    ],color=invest_color, inverse=True),
-                dbc.Card(id="year3_card", children=[
-                    dbc.CardBody(
-                        [
-                            html.H3("Year 3 FCF", style={'fontWeight': 'bold'}),
-                            html.H5(id = 'year3', children=[
-                                year3]
-                            ),
-                            html.H5(id = 'year3_string', children=[
-                                year3_string]
+                    ])
+                ]),
+                dbc.Col([
+                    dbc.Container([
+                        dbc.FormGroup([
+                            dbc.Label('Monthly revenue per kw'),
+                            dbc.Input(
+                                placeholder='160',
+                                type='number',
+                                id='kw_revenue_' + str(number),
+                                persistence=True,
+                                persistence_type='session',
+                                disabled=disabled,
+                                value=160
                             )
                         ])
-                ], color=year3_color, inverse=True),
-        ])]),
-    ]),
-    dbc.Row([html.P('')])
-], label='Output', tab_id='tab-2')], id='tabs', active_tab='tab-1')
+                    ])
+                ]),
+            ], id='collapse_'+str(number))
+        ]),
+        dbc.Col([
+            dbc.Container([
+                dbc.Button('OK', color='primary', disabled=disabled, block=True, id='submit_'+str(number))
+            ])
+        ]),
+        dbc.Col([
+            dbc.Container([
+                dbc.Button('Remove', color='warning', disabled=disabled, block=True, id='remove_' + str(number))
+            ])
+        ])
+    ])
+    ], style={'display':visible}, id='div'+str(i))
+    return a
+
+
+visible_list = ['block'] * 2 + ['none'] * 8
+disabled_list = [False]*1+[True]*9
+
+inputs = []
+for i, (x, y) in enumerate(zip(visible_list, disabled_list)):
+    inputs.append(create_input_group(i, disabled=y, visible=x))
+
+def create_outputs_change_disabled(number):
+    outputs = []
+    ids = ['select', 'power_capacity', 'sqft', 'current_percent', 'utility', 'rent', 'usage',
+           'kw_revenue','advanced','submit']
+    new_ids = []
+    for x in ids:
+        new_ids.append(x+'_'+str(number))
+    for x in new_ids:
+        outputs.append(Output(x, 'disabled'))
+    outputs.append(Output('growth_curve_'+str(number), 'options'))
+    return outputs
+
+def create_states(number):
+    states = []
+    ids = ['select', 'power_capacity', 'sqft', 'current_percent', 'utility', 'rent', 'usage',
+           'kw_revenue','growth_curve']
+    new_ids = []
+    for x in ids:
+        new_ids.append(x+'_'+str(number))
+    for x in new_ids:
+        states.append(State(x, 'value'))
+    return states
+
+def create_outputs_change_visibility(number):
+    outputs = []
+    name = 'div'+str(number)
+    outputs.append(Output(name, 'style'))
+    return outputs
+
+app.layout = dbc.Tabs([
+    dbc.Tab([
+        dbc.Container([
+            dbc.Row([dbc.Col([html.H1('Welcome')])], justify='center'),
+            dbc.Row([dbc.Col([html.H1('Project Eagle Dashboard')])], justify='center'),
+        ])
+    ], label='Welcome', tab_id='welcome'),
+    dbc.Tab([
+        dbc.Container([
+            dbc.Row([
+                dbc.Col([
+                    html.H2('Enter Projected Data Centers'),
+                    html.Div([],id='card_tracking', style={'display':'none'})
+                ])
+            ]),
+            dbc.Row([
+                dbc.Col([
+                    html.H5(
+                        'You can key metrics and add data centers here. For more advanced options, please see the advanced tab')
+                ])
+            ]),
+            dbc.Row(dbc.Col(dbc.Button('Submit', id='big_sub', block=True, color='primary'))),
+            dbc.Row([dbc.Col(dbc.Button('Add Data Center', id='plus', block=True, color='success'))]),
+            dbc.Row(html.P('')),
+            dbc.Row(
+                inputs, id='input_row')
+        ]),
+        html.Div(children=final_df.to_json(),id='intermediate-value', style={'display': 'none'})
+    ], label='Input', tab_id='input'),
+    dbc.Tab([
+        dbc.Row([dbc.Col([dbc.Container([], id='proj')])])
+    ], label='Projected Financials', tab_id='proj')
+], id='tabs', active_tab='input')
+
+all_states = []
+for x in range(10):
+    all_states = all_states+create_states(x)
+big_sub_input = [Input('big_sub', 'n_clicks')]
+
+all_vis_outputs = []
+for x in range(10):
+    all_vis_outputs+=create_outputs_change_visibility(x)
+
+#Change the graph
+
+@app.callback(Output('card_tracking', 'children'),
+              [Input('plus', 'n_clicks')],
+              [State('card_tracking', 'children')])
+def change(n,current):
+    if n:
+        current = list(current)
+        current.sort()
+        all = list(np.arange(10))
+        avail = all-current
+        next = avail[0]
+        current.append(next)
+        return current
+    else:
+        return current
+
+@app.callback(all_vis_outputs,
+              [Input('card_tracking', 'children')],
+              [State('input_row', 'children')])
+
+def update_visibility(tracking, current_inp):
+    for idx in tracking:
+        current_inp[idx] = create_input_group(idx,False,'block')
+    return current_inp
+
+@app.callback(Output('intermediate-value', 'children'),
+              big_sub_input,
+              all_states)
+def update_df(*args):
+    input_names = [item.component_id for item in big_sub_input + all_states]
+    kwargs = dict(zip(input_names, args))
+    array = np.zeros([6,21])
+    count = 0
+    for x in range(10):
+        name = 'select_'+str(x)
+        if (kwargs[name] is not None) & (kwargs[name]!='None selected'):
+            print(kwargs[name])
+            find = [i for i in input_names if str(x) in i]
+            find.remove(name)
+            dc = DataCenter(kwargs[find[0]], kwargs[find[1]], growth_curve=kwargs[find[-1]], starting_capacity=kwargs[find[2]],
+                            offset=int(kwargs[name]), utility_kw_hr_rate=kwargs[find[3]], rent_per_sqft= kwargs[find[4]],
+                            usage_rate=kwargs[find[5]], monthly_revenue_per_kw=kwargs[find[6]])
+            a = dc.get_all_for_addition()
+            array = array+a
+            count+=1
+    if count>0:
+        df = pd.DataFrame(array, columns=quarters, index=list(dc.df.index))
+        json = df.to_json()
+        return json
+    else:
+        return final_df.to_json()
+@app.callback(Output('proj', 'children'),
+              [Input('intermediate-value','children')]
+)
+def run_graph(json):
+    current_df = pd.read_json(json, convert_dates=False, convert_axes=False)
+    current_df = current_df.round(0)
+    #ind = list(current_df.index)[2:]
+
+    dt = dash_table.DataTable(
+        id='table',
+        style_cell={
+            'whiteSpace': 'normal',
+            'height': 'auto',
+        },
+        columns = [{"name":i, "id":i} for i in list(current_df.reset_index().columns)[:1]]+[{"name":i, "id":i, "type":'numeric', 'format':FormatTemplate.money(0)} for i in list(current_df.reset_index().columns)[1:]],
+        data = current_df.reset_index().to_dict(orient='records'),
+
+    )
+    return dt
+
+@app.callback(
+    Output("collapse_0", "is_open"),
+    [Input("advanced_0", "n_clicks")],
+    [State("collapse_0", "is_open")],
+)
+def toggle_collapse(n,is_open):
+    if n:
+        return not is_open
+    return is_open
 
 
 @app.callback(
-    [
-        Output('mult', 'children'),
-        Output('multiple_string', 'children'),
-        Output('invest', 'children'),
-        Output('investment_string', 'children'),
-        Output('year3', 'children'),
-        Output('year3_string', 'children'),
-        Output('npv_mean', 'children'),
-        Output('npv_string', 'children'),
-        Output('hist', 'figure'),
-        Output('scatter', 'figure'),
-        Output('tabs','active_tab'),
-        Output('mult_card','color'),
-        Output('invest_card','color'),
-        Output('year3_card','color'),
-        Output('npv_card','color')
-    ],
-              [Input('submit_button', 'n_clicks')],
-              [
-                  State('mkt_growth_min', 'value'),
-                  State('mkt_growth_mode', 'value'),
-                  State('mkt_growth_max', 'value'),
-                  State('mkt_takeup_min', 'value'),
-                  State('mkt_takeup_mode', 'value'),
-                  State('mkt_takeup_max', 'value'),
-                  State('mkt_share_min', 'value'),
-                  State('mkt_share_mode', 'value'),
-                  State('mkt_share_max', 'value'),
-                  State('gf_min', 'value'),
-                  State('gf_mode', 'value'),
-                  State('gf_max', 'value'),
-                  State('ref_rate_min', 'value'),
-                  State('ref_rate_mode', 'value'),
-                  State('ref_rate_max', 'value'),
-                  State('churn_rate_min', 'value'),
-                  State('churn_rate_mode', 'value'),
-                  State('churn_rate_max', 'value'),
-                  State('margin_min', 'value'),
-                  State('margin_mode', 'value'),
-                  State('margin_max', 'value'),
-                  State('aq_exp_mean', 'value'),
-                  State('aq_exp_std', 'value'),
-                  State('aq_cap_mean', 'value'),
-                  State('aq_cap_std', 'value'),
-                  State('fc_min', 'value'),
-                  State('fc_mode', 'value'),
-                  State('fc_max', 'value')
-              ]
-            )
-def update_output(n_clicks,a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,aa,bb):
-    list_of_values = [a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,aa,bb]
-    distribution_dict = create_dist_dict_from_list(list_of_values)
-    print(distribution_dict)
+    Output("collapse_1", "is_open"),
+    [Input("advanced_1", "n_clicks")],
+    [State("collapse_1", "is_open")],
+)
+def toggle_collapse(n, is_open):
+    if n:
+        return not is_open
+    return is_open
 
-    dists = []
-    for statistics in list(distribution_dict.values()):
-        dists.append(Distribution(*statistics))
 
-    manager_estimates = dict(zip(list(distribution_dict.keys()), dists))
-    if n_clicks is not None:
-        active_tab='tab-2'
+@app.callback(
+    Output("collapse_2", "is_open"),
+    [Input("advanced_2", "n_clicks")],
+    [State("collapse_2", "is_open")],
+)
+def toggle_collapse(n, is_open):
+    if n:
+        return not is_open
+    return is_open
+
+
+@app.callback(
+    Output("collapse_3", "is_open"),
+    [Input("advanced_3", "n_clicks")],
+    [State("collapse_3", "is_open")],
+)
+def toggle_collapse(n, is_open):
+    if n:
+        return not is_open
+
+    return is_open
+
+
+@app.callback(
+    Output("collapse_4", "is_open"),
+    [Input("advanced_4", "n_clicks")],
+    [State("collapse_4", "is_open")],
+)
+def toggle_collapse(n, is_open):
+    if n:
+        return not is_open
+
+    return is_open
+
+
+@app.callback(
+    Output("collapse_5", "is_open"),
+    [Input("advanced_5", "n_clicks")],
+    [State("collapse_5", "is_open")],
+)
+def toggle_collapse(n, is_open):
+    if n:
+        return not is_open
+
+    return is_open
+
+
+@app.callback(
+    Output("collapse_6", "is_open"),
+    [Input("advanced_6", "n_clicks")],
+    [State("collapse_6", "is_open")],
+)
+def toggle_collapse(n, is_open):
+    if n:
+        return not is_open
+
+    return is_open
+
+
+@app.callback(
+    Output("collapse_7", "is_open"),
+    [Input("advanced_7", "n_clicks")],
+    [State("collapse_7", "is_open")],
+)
+def toggle_collapse(n, is_open):
+    if n:
+        return not is_open
+
+    return is_open
+
+
+@app.callback(
+    Output("collapse_8", "is_open"),
+    [Input("advanced_8", "n_clicks")],
+    [State("collapse_8", "is_open")],
+)
+def toggle_collapse(n, is_open):
+    if n:
+        return not is_open
+
+    return is_open
+
+
+@app.callback(
+    Output("collapse_9", "is_open"),
+    [Input("advanced_9", "n_clicks")],
+    [State("collapse_9", "is_open")],
+)
+def toggle_collapse(n, is_open):
+    if n:
+        return not is_open
+
+    return is_open
+
+
+#Remove button submit reset
+@app.callback(Output('submit_0', 'n_clicks'),[Input('remove_0', 'n_clicks')])
+def reset_remove_clicks(n):
+    if n:
+        return None
     else:
-        active_tab='tab-1'
-    mult, multiple_string, invest, investment_string, year3, year3_string, npv_mean, npv_string, hist, scatter, mult_color, invest_color, year3_color, npv_color = run_simulation(manager_estimates)
-    return mult, multiple_string, invest, investment_string, year3, year3_string, npv_mean, npv_string, hist, scatter, active_tab, mult_color, invest_color, year3_color, npv_color
+        return None
+@app.callback(Output('submit_1', 'n_clicks'),[Input('remove_1', 'n_clicks')])
+def reset_remove_clicks(n):
+    if n:
+        return None
+    else:
+        return None
+@app.callback(Output('submit_2', 'n_clicks'),[Input('remove_2', 'n_clicks')])
+def reset_remove_clicks(n):
+    if n:
+        return None
+    else:
+        return None
+@app.callback(Output('submit_3', 'n_clicks'),[Input('remove_3', 'n_clicks')])
+def reset_remove_clicks(n):
+    if n:
+        return None
+    else:
+        return None
+@app.callback(Output('submit_4', 'n_clicks'),[Input('remove_4', 'n_clicks')])
+def reset_remove_clicks(n):
+    if n:
+        return None
+    else:
+        return None
+@app.callback(Output('submit_5', 'n_clicks'),[Input('remove_5', 'n_clicks')])
+def reset_remove_clicks(n):
+    if n:
+        return None
+    else:
+        return None
+@app.callback(Output('submit_6', 'n_clicks'),[Input('remove_6', 'n_clicks')])
+def reset_remove_clicks(n):
+    if n:
+        return None
+    else:
+        return None
+@app.callback(Output('submit_7', 'n_clicks'),[Input('remove_7', 'n_clicks')])
+def reset_remove_clicks(n):
+    if n:
+        return None
+    else:
+        return None
+@app.callback(Output('submit_8', 'n_clicks'),[Input('remove_8', 'n_clicks')])
+def reset_remove_clicks(n):
+    if n:
+        return None
+    else:
+        return None
+@app.callback(Output('submit_9', 'n_clicks'),[Input('remove_9', 'n_clicks')])
+def reset_remove_clicks(n):
+    if n:
+        return None
+    else:
+        return None
+
+#Submit button add more entries
+@app.callback(create_outputs_change_disabled(1)+create_outputs_change_visibility(2)+[Output('remove_0', 'disabled')],
+              [Input('submit_0','n_clicks'),Input('remove_0','n_clicks')])
+def incremental_change(n1,n2):
+    if n1:
+        l = [False]*10
+        options = [
+            {"label": "Conservative", "value": 'conservative', "disabled": False},
+            {"label": "Standard", "value": 'standard', "disabled": False}
+        ]
+        l = l+[options]
+        l = l+[{'display':'block'}]
+        l = l+[False]
+        return l
+    elif n2:
+        l = [True]*10
+        options = [
+            {"label": "Conservative", "value": 'conservative', "disabled": True},
+            {"label": "Standard", "value": 'standard', "disabled": True}
+        ]
+        l = l+[options]
+        l = l+[{'display':'none'}]
+        l = l+[True]
+        return l
+    else:
+        l = [True] * 10
+        options = [
+            {"label": "Conservative", "value": 'conservative', "disabled": True},
+            {"label": "Standard", "value": 'standard', "disabled": True}
+        ]
+        l = l + [options]
+        l = l + [{'display': 'none'}]
+        l = l + [True]
+        return l
+@app.callback(create_outputs_change_disabled(2)+create_outputs_change_visibility(3)+[Output('remove_1', 'disabled')],
+              [Input('submit_1','n_clicks'),Input('remove_1', 'n_clicks')])
+def incremental_change(n1,n2):
+    if n1:
+        l = [False]*10
+        options = [
+            {"label": "Conservative", "value": 'conservative', "disabled": False},
+            {"label": "Standard", "value": 'standard', "disabled": False}
+        ]
+        l = l+[options]
+        l = l+[{'display':'block'}]
+        l = l+[False]
+        return l
+    elif n2:
+        l = [True]*10
+        options = [
+            {"label": "Conservative", "value": 'conservative', "disabled": True},
+            {"label": "Standard", "value": 'standard', "disabled": True}
+        ]
+        l = l+[options]
+        l = l+[{'display':'none'}]
+        l = l+[True]
+        return l
+    else:
+        l = [True] * 10
+        options = [
+            {"label": "Conservative", "value": 'conservative', "disabled": True},
+            {"label": "Standard", "value": 'standard', "disabled": True}
+        ]
+        l = l + [options]
+        l = l + [{'display': 'none'}]
+        l = l + [True]
+        return l
+@app.callback(create_outputs_change_disabled(3)+create_outputs_change_visibility(4)+[Output('remove_2', 'disabled')],
+              [Input('submit_2','n_clicks'),Input('remove_2', 'n_clicks')])
+def incremental_change(n1,n2):
+    if n1:
+        l = [False]*10
+        options = [
+            {"label": "Conservative", "value": 'conservative', "disabled": False},
+            {"label": "Standard", "value": 'standard', "disabled": False}
+        ]
+        l = l+[options]
+        l = l+[{'display':'block'}]
+        l = l+[False]
+        return l
+    elif n2:
+        l = [True]*10
+        options = [
+            {"label": "Conservative", "value": 'conservative', "disabled": True},
+            {"label": "Standard", "value": 'standard', "disabled": True}
+        ]
+        l = l+[options]
+        l = l+[{'display':'none'}]
+        l = l+[True]
+        return l
+    else:
+        l = [True] * 10
+        options = [
+            {"label": "Conservative", "value": 'conservative', "disabled": True},
+            {"label": "Standard", "value": 'standard', "disabled": True}
+        ]
+        l = l + [options]
+        l = l + [{'display': 'none'}]
+        l = l + [True]
+        return l
+
+@app.callback(create_outputs_change_disabled(4)+create_outputs_change_visibility(5)+[Output('remove_3', 'disabled')],
+              [Input('submit_3','n_clicks'),Input('remove_3', 'n_clicks')])
+def incremental_change(n1,n2):
+    if n1:
+        l = [False]*10
+        options = [
+            {"label": "Conservative", "value": 'conservative', "disabled": False},
+            {"label": "Standard", "value": 'standard', "disabled": False}
+        ]
+        l = l+[options]
+        l = l+[{'display':'block'}]
+        l = l+[False]
+        return l
+    elif n2:
+        l = [True]*10
+        options = [
+            {"label": "Conservative", "value": 'conservative', "disabled": True},
+            {"label": "Standard", "value": 'standard', "disabled": True}
+        ]
+        l = l+[options]
+        l = l+[{'display':'none'}]
+        l = l+[True]
+        return l
+    else:
+        l = [True] * 10
+        options = [
+            {"label": "Conservative", "value": 'conservative', "disabled": True},
+            {"label": "Standard", "value": 'standard', "disabled": True}
+        ]
+        l = l + [options]
+        l = l + [{'display': 'none'}]
+        l = l + [True]
+        return l
+@app.callback(create_outputs_change_disabled(5)+create_outputs_change_visibility(6)+[Output('remove_4', 'disabled')],
+              [Input('submit_4','n_clicks'),Input('remove_4', 'n_clicks')])
+def incremental_change(n1,n2):
+    if n1:
+        l = [False]*10
+        options = [
+            {"label": "Conservative", "value": 'conservative', "disabled": False},
+            {"label": "Standard", "value": 'standard', "disabled": False}
+        ]
+        l = l+[options]
+        l = l+[{'display':'block'}]
+        l = l+[False]
+        return l
+    elif n2:
+        l = [True]*10
+        options = [
+            {"label": "Conservative", "value": 'conservative', "disabled": True},
+            {"label": "Standard", "value": 'standard', "disabled": True}
+        ]
+        l = l+[options]
+        l = l+[{'display':'none'}]
+        l = l+[True]
+        return l
+    else:
+        l = [True] * 10
+        options = [
+            {"label": "Conservative", "value": 'conservative', "disabled": True},
+            {"label": "Standard", "value": 'standard', "disabled": True}
+        ]
+        l = l + [options]
+        l = l + [{'display': 'none'}]
+        l = l + [True]
+        return l
+@app.callback(create_outputs_change_disabled(6)+create_outputs_change_visibility(7)+[Output('remove_5', 'disabled')],
+              [Input('submit_5','n_clicks'),Input('remove_5', 'n_clicks')])
+def incremental_change(n1,n2):
+    if n1:
+        l = [False]*10
+        options = [
+            {"label": "Conservative", "value": 'conservative', "disabled": False},
+            {"label": "Standard", "value": 'standard', "disabled": False}
+        ]
+        l = l+[options]
+        l = l+[{'display':'block'}]
+        l = l+[False]
+        return l
+    elif n2:
+        l = [True]*10
+        options = [
+            {"label": "Conservative", "value": 'conservative', "disabled": True},
+            {"label": "Standard", "value": 'standard', "disabled": True}
+        ]
+        l = l+[options]
+        l = l+[{'display':'none'}]
+        l = l+[True]
+        return l
+    else:
+        l = [True] * 10
+        options = [
+            {"label": "Conservative", "value": 'conservative', "disabled": True},
+            {"label": "Standard", "value": 'standard', "disabled": True}
+        ]
+        l = l + [options]
+        l = l + [{'display': 'none'}]
+        l = l + [True]
+        return l
+@app.callback(create_outputs_change_disabled(7)+create_outputs_change_visibility(8)+[Output('remove_6', 'disabled')],
+              [Input('submit_6','n_clicks'),Input('remove_6', 'n_clicks')])
+def incremental_change(n1,n2):
+    if n1:
+        l = [False]*10
+        options = [
+            {"label": "Conservative", "value": 'conservative', "disabled": False},
+            {"label": "Standard", "value": 'standard', "disabled": False}
+        ]
+        l = l+[options]
+        l = l+[{'display':'block'}]
+        l = l+[False]
+        return l
+    elif n2:
+        l = [True]*10
+        options = [
+            {"label": "Conservative", "value": 'conservative', "disabled": True},
+            {"label": "Standard", "value": 'standard', "disabled": True}
+        ]
+        l = l+[options]
+        l = l+[{'display':'none'}]
+        l = l+[True]
+        return l
+    else:
+        l = [True] * 10
+        options = [
+            {"label": "Conservative", "value": 'conservative', "disabled": True},
+            {"label": "Standard", "value": 'standard', "disabled": True}
+        ]
+        l = l + [options]
+        l = l + [{'display': 'none'}]
+        l = l + [True]
+        return l
+@app.callback(create_outputs_change_disabled(8)+create_outputs_change_visibility(9)+[Output('remove_7', 'disabled')],
+              [Input('submit_7','n_clicks'),Input('remove_7', 'n_clicks')])
+def incremental_change(n1,n2):
+    if n1:
+        l = [False]*10
+        options = [
+            {"label": "Conservative", "value": 'conservative', "disabled": False},
+            {"label": "Standard", "value": 'standard', "disabled": False}
+        ]
+        l = l+[options]
+        l = l+[{'display':'block'}]
+        l = l+[False]
+        return l
+    elif n2:
+        l = [True]*10
+        options = [
+            {"label": "Conservative", "value": 'conservative', "disabled": True},
+            {"label": "Standard", "value": 'standard', "disabled": True}
+        ]
+        l = l+[options]
+        l = l+[{'display':'none'}]
+        l = l+[True]
+        return l
+    else:
+        l = [True] * 10
+        options = [
+            {"label": "Conservative", "value": 'conservative', "disabled": True},
+            {"label": "Standard", "value": 'standard', "disabled": True}
+        ]
+        l = l + [options]
+        l = l + [{'display': 'none'}]
+        l = l + [True]
+        return l
+@app.callback(create_outputs_change_disabled(9)+[Output('remove_8', 'disabled')],
+              [Input('submit_8','n_clicks'),Input('remove_8', 'n_clicks')])
+def incremental_change(n1,n2):
+    if n1:
+        l = [False]*10
+        options = [
+            {"label": "Conservative", "value": 'conservative', "disabled": False},
+            {"label": "Standard", "value": 'standard', "disabled": False}
+        ]
+        l = l+[options]
+        l = l+[False]
+        return l
+    elif n2:
+        l = [True]*10
+        options = [
+            {"label": "Conservative", "value": 'conservative', "disabled": True},
+            {"label": "Standard", "value": 'standard', "disabled": True}
+        ]
+        l = l+[options]
+        l = l+[True]
+        return l
+    else:
+        l = [True] * 10
+        options = [
+            {"label": "Conservative", "value": 'conservative', "disabled": True},
+            {"label": "Standard", "value": 'standard', "disabled": True}
+        ]
+        l = l + [options]
+        l = l + [True]
+        return l
+
+#Submit button add DC objects
+
 
 if __name__ == '__main__':
     app.run_server(debug=True)
