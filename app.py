@@ -4,6 +4,7 @@ import dash_html_components as html
 import plotly.graph_objects as go
 import dash_table
 import dash_table.FormatTemplate as FormatTemplate
+from dash_table.Format import Format
 import pandas as pd
 import dash_bootstrap_components as dbc
 from dash.dependencies import Input, Output, State
@@ -14,6 +15,11 @@ from sklearn.linear_model import LinearRegression
 
 warnings.simplefilter('ignore')
 
+columns = ['Opportunity', 'Square Footage', 'Power Capacity','Tier', 'Projected ROI multiplier']
+kop = ['King of Prussia', 30000, 3000, 3, 30]
+curca = ['Curacao', 60000, 6000, 4, 30]
+org = ['Oregon', 300000, 32000, 3, 50]
+opp_df = pd.DataFrame([kop,curca, org], columns = columns)
 
 def find_target_rate(power_capacity, growth_curve='conservative'):
     assert growth_curve in ['standard', 'conservative'], 'Invalid growth curve option'
@@ -122,10 +128,8 @@ class DataCenter:
 
     def quarterly_effective(self):
         change_cabs = self.quarterly_new_cabinets
-        print(change_cabs)
         for x in [5, 9, 13, 17]:
             change_cabs[x] = change_cabs[x] - 1
-        print(change_cabs)
         cum = np.cumsum(change_cabs)
         skip = np.cumsum(change_cabs)
         skip = list(skip)
@@ -393,11 +397,6 @@ def create_input_group(number, disabled,visible):
         ]),
         dbc.Col([
             dbc.Container([
-                dbc.Button('OK', color='primary', disabled=disabled, block=True, id='submit_'+str(number))
-            ])
-        ]),
-        dbc.Col([
-            dbc.Container([
                 dbc.Button('Remove', color='warning', disabled=disabled, block=True, id='remove_' + str(number))
             ])
         ])
@@ -405,13 +404,167 @@ def create_input_group(number, disabled,visible):
     ], style={'display':visible}, id='div'+str(i))
     return a
 
+def create_input_group_no_div(number, disabled,visible):
+    a = dbc.Card([
+        dbc.CardHeader('Datacenter ' + str(number + 1)),
+        dbc.Col([
+            dbc.Container([
+                dbc.FormGroup([
+                    dbc.Label('Select Quarter'),
+                    dbc.Select(options=quarter_dropdown_options, value=None, disabled=disabled, id='select_'+str(number))
+                ])
+            ])
+        ]),
+        dbc.Col([
+            dbc.Container([
+                dbc.FormGroup([
+                    dbc.Label('Power Capacity (kw)'),
+                    dbc.Input(
+                        placeholder='3000',
+                        type='number',
+                        id='power_capacity_' + str(number),
+                        persistence=True,
+                        persistence_type='session',
+                        disabled=disabled,
+                        value=3000
+                    )
+                ])
+            ])
+        ]),
+        dbc.Col([
+            dbc.Container([
+                dbc.FormGroup([
+                    dbc.Label('Square Footage'),
+                    dbc.Input(
+                        placeholder='27,871',
+                        type='number',
+                        id='sqft_' + str(number),
+                        persistence=True,
+                        persistence_type='session',
+                        disabled=disabled,
+                        value=27971
+                    )
+                ])
+            ])
+        ]),
+        dbc.Col([
+            dbc.Container([
+                dbc.FormGroup([
+                    dbc.Label('Percent of Capacity Filled Currently'),
+                    dbc.Input(
+                        placeholder='0%',
+                        type='number',
+                        id='current_percent_' + str(number),
+                        persistence=True,
+                        persistence_type='session',
+                        disabled=disabled,
+                        value=0
+                    )
+                ])
+            ])
+        ]),
+        dbc.Col([
+            dbc.Container([
+                dbc.FormGroup([
+                    dbc.Label('Growth Curve'),
+                    dbc.RadioItems(
+                        options=[
+                            {"label": "Conservative", "value": 'conservative', "disabled": disabled},
+                            {"label": "Standard", "value": 'standard', "disabled": disabled}
+                        ],
+                        value='conservative',
+                        id='growth_curve_' + str(number),
+                        persistence=True,
+                        persistence_type='session',
+                    )
+                ])
+            ])
+        ]),
+        dbc.Col([
+            dbc.Container([
+                dbc.Button('Advanced Options', color='secondary', disabled=disabled, block=True, id='advanced_'+str(number))
+            ]),
+            dbc.Collapse([
+                dbc.Col([
+                    dbc.Container([
+                        dbc.FormGroup([
+                            dbc.Label('Utility cost per kw/hr'),
+                            dbc.Input(
+                                placeholder='$0.13',
+                                type='number',
+                                id='utility_' + str(number),
+                                persistence=True,
+                                persistence_type='session',
+                                disabled=disabled,
+                                value=0.13
+                            )
+                        ])
+                    ])
+                ]),
+                dbc.Col([
+                    dbc.Container([
+                        dbc.FormGroup([
+                            dbc.Label('Rent per sqft'),
+                            dbc.Input(
+                                placeholder='31',
+                                type='number',
+                                id='rent_' + str(number),
+                                persistence=True,
+                                persistence_type='session',
+                                disabled=disabled,
+                                value=31
+                            )
+                        ])
+                    ])
+                ]),
+                dbc.Col([
+                    dbc.Container([
+                        dbc.FormGroup([
+                            dbc.Label('Usage Rate'),
+                            dbc.Input(
+                                placeholder='0.7',
+                                type='number',
+                                id='usage_' + str(number),
+                                persistence=True,
+                                persistence_type='session',
+                                disabled=disabled,
+                                value=0.7
+                            )
+                        ])
+                    ])
+                ]),
+                dbc.Col([
+                    dbc.Container([
+                        dbc.FormGroup([
+                            dbc.Label('Monthly revenue per kw'),
+                            dbc.Input(
+                                placeholder='160',
+                                type='number',
+                                id='kw_revenue_' + str(number),
+                                persistence=True,
+                                persistence_type='session',
+                                disabled=disabled,
+                                value=160
+                            )
+                        ])
+                    ])
+                ]),
+            ], id='collapse_'+str(number))
+        ]),
+        dbc.Col([
+            dbc.Container([
+                dbc.Button('Remove', color='warning', disabled=disabled, block=True, id='remove_' + str(number))
+            ])
+        ])
+    ])
+    return a
 
-visible_list = ['block'] * 2 + ['none'] * 8
-disabled_list = [False]*1+[True]*9
+
+visible_list = ['block'] * 1 + ['none'] * 9
 
 inputs = []
-for i, (x, y) in enumerate(zip(visible_list, disabled_list)):
-    inputs.append(create_input_group(i, disabled=y, visible=x))
+for i,x in enumerate(visible_list):
+    inputs.append(create_input_group(i, disabled=False, visible=x))
 
 def create_outputs_change_disabled(number):
     outputs = []
@@ -442,6 +595,24 @@ def create_outputs_change_visibility(number):
     outputs.append(Output(name, 'style'))
     return outputs
 
+def create_inputs_change_visibility_reset(number):
+    outputs = []
+    name = 'div'+str(number)
+    outputs.append(Input(name, 'style'))
+    return outputs
+
+def create_current_state_visibility(number):
+    outputs = []
+    name = 'div'+str(number)
+    outputs.append(State(name, 'style'))
+    return outputs
+
+def create_remove_button_input(number):
+    outputs = []
+    name = 'remove_'+str(number)
+    outputs.append(Input(name, 'n_clicks'))
+    return outputs
+
 app.layout = dbc.Tabs([
     dbc.Tab([
         dbc.Container([
@@ -454,26 +625,39 @@ app.layout = dbc.Tabs([
             dbc.Row([
                 dbc.Col([
                     html.H2('Enter Projected Data Centers'),
-                    html.Div([],id='card_tracking', style={'display':'none'})
+                    html.Div([0],id='card_tracking', style={'display':'none'})
                 ])
             ]),
             dbc.Row([
                 dbc.Col([
                     html.H5(
-                        'You can key metrics and add data centers here. For more advanced options, please see the advanced tab')
+                        'You can adjust key metrics and add data centers here. For more advanced options, click on the advanced dropdown menu')
                 ])
             ]),
             dbc.Row(dbc.Col(dbc.Button('Submit', id='big_sub', block=True, color='primary'))),
             dbc.Row([dbc.Col(dbc.Button('Add Data Center', id='plus', block=True, color='success'))]),
             dbc.Row(html.P('')),
             dbc.Row(
-                inputs, id='input_row')
+                inputs, id='input_row', align='center', justify='center')
         ]),
         html.Div(children=final_df.to_json(),id='intermediate-value', style={'display': 'none'})
     ], label='Input', tab_id='input'),
     dbc.Tab([
         dbc.Row([dbc.Col([dbc.Container([], id='proj')])])
-    ], label='Projected Financials', tab_id='proj')
+    ], label='Projected Financials', tab_id='proj'),
+    dbc.Tab([
+        dbc.Container([
+            dash_table.DataTable(
+            id='table',
+            style_cell={
+                'whiteSpace': 'normal',
+                'height': 'auto',
+            },
+            columns = [{"name":i, "id":i} for i in list(opp_df.columns)],
+            data = opp_df.to_dict(orient='records')
+            )
+        ])
+    ], label='Current Sourced Opportunities', tab_id='opp')
 ], id='tabs', active_tab='input')
 
 all_states = []
@@ -485,31 +669,155 @@ all_vis_outputs = []
 for x in range(10):
     all_vis_outputs+=create_outputs_change_visibility(x)
 
+all_vis_states = []
+for x in range(10):
+    all_vis_states+=create_current_state_visibility(x)
+
+all_remove_inputs = []
+for x in range(10):
+    all_remove_inputs+=create_remove_button_input(x)
+
+all_style_inputs = []
+for x in range(10):
+    all_style_inputs+=create_inputs_change_visibility_reset(x)
 #Change the graph
 
+@app.callback(Output('plus', 'n_clicks'),
+              all_remove_inputs)
+def reset(*args):
+    for x in args:
+        if x:
+            return None
+    else:
+        return None
 @app.callback(Output('card_tracking', 'children'),
-              [Input('plus', 'n_clicks')],
+              [Input('plus', 'n_clicks')]+all_remove_inputs,
               [State('card_tracking', 'children')])
-def change(n,current):
+def change(*args):
+    n = args[0]
+    current = args[-1]
+    remove = args[1:-1]
+    print(args)
     if n:
         current = list(current)
         current.sort()
         all = list(np.arange(10))
-        avail = all-current
+        avail = set(all)-set(current)
+        avail = list(avail)
         next = avail[0]
         current.append(next)
         return current
+    for i,x in enumerate(remove):
+        if x:
+            current = list(current)
+            current.remove(i)
+            return current
     else:
         return current
 
 @app.callback(all_vis_outputs,
               [Input('card_tracking', 'children')],
-              [State('input_row', 'children')])
+              all_vis_states)
 
-def update_visibility(tracking, current_inp):
+def update_visibility(*args):
+    tracking = args[0]
+    initial_list = [{'display':'none'}]*10
     for idx in tracking:
-        current_inp[idx] = create_input_group(idx,False,'block')
-    return current_inp
+        initial_list[idx] = {'display':'block'}
+    return initial_list
+
+@app.callback(Output('div0', 'children'),
+              [Input('div0', 'style')],
+              [State('div0', 'children')])
+def reset(style, current):
+    if style['display']=='none':
+        out = create_input_group_no_div(0, False, 'none')
+        return out
+    else:
+        return current
+
+@app.callback(Output('div1', 'children'),
+              [Input('div1', 'style')],
+              [State('div1', 'children')])
+def reset(style, current):
+    if style['display']=='none':
+        out = create_input_group_no_div(1, False, 'none')
+        return out
+    else:
+        return current
+
+@app.callback(Output('div2', 'children'),
+              [Input('div2', 'style')],
+              [State('div2', 'children')])
+def reset(style, current):
+    if style['display']=='none':
+        out = create_input_group_no_div(2, False, 'none')
+        return out
+    else:
+        return current
+@app.callback(Output('div3', 'children'),
+              [Input('div3', 'style')],
+              [State('div3', 'children')])
+def reset(style, current):
+    if style['display']=='none':
+        out = create_input_group_no_div(3, False, 'none')
+        return out
+    else:
+        return current
+@app.callback(Output('div4', 'children'),
+              [Input('div4', 'style')],
+              [State('div4', 'children')])
+def reset(style, current):
+    if style['display']=='none':
+        out = create_input_group_no_div(4, False, 'none')
+        return out
+    else:
+        return current
+@app.callback(Output('div5', 'children'),
+              [Input('div5', 'style')],
+              [State('div5', 'children')])
+def reset(style, current):
+    if style['display']=='none':
+        out = create_input_group_no_div(5, False, 'none')
+        return out
+    else:
+        return current
+@app.callback(Output('div6', 'children'),
+              [Input('div6', 'style')],
+              [State('div6', 'children')])
+def reset(style, current):
+    if style['display']=='none':
+        out = create_input_group_no_div(6, False, 'none')
+        return out
+    else:
+        return current
+@app.callback(Output('div7', 'children'),
+              [Input('div7', 'style')],
+              [State('div7', 'children')])
+def reset(style, current):
+    if style['display']=='none':
+        out = create_input_group_no_div(7, False, 'none')
+        return out
+    else:
+        return current
+@app.callback(Output('div8', 'children'),
+              [Input('div8', 'style')],
+              [State('div8', 'children')])
+def reset(style, current):
+    if style['display']=='none':
+        out = create_input_group_no_div(8, False, 'none')
+        return out
+    else:
+        return current
+@app.callback(Output('div9', 'children'),
+              [Input('div9', 'style')],
+              [State('div9', 'children')])
+def reset(style, current):
+    if style['display']=='none':
+        out = create_input_group_no_div(9, False, 'none')
+        return out
+    else:
+        return current
 
 @app.callback(Output('intermediate-value', 'children'),
               big_sub_input,
@@ -522,7 +830,6 @@ def update_df(*args):
     for x in range(10):
         name = 'select_'+str(x)
         if (kwargs[name] is not None) & (kwargs[name]!='None selected'):
-            print(kwargs[name])
             find = [i for i in input_names if str(x) in i]
             find.remove(name)
             dc = DataCenter(kwargs[find[0]], kwargs[find[1]], growth_curve=kwargs[find[-1]], starting_capacity=kwargs[find[2]],
@@ -551,7 +858,7 @@ def run_graph(json):
             'whiteSpace': 'normal',
             'height': 'auto',
         },
-        columns = [{"name":i, "id":i} for i in list(current_df.reset_index().columns)[:1]]+[{"name":i, "id":i, "type":'numeric', 'format':FormatTemplate.money(0)} for i in list(current_df.reset_index().columns)[1:]],
+        columns = [{"name":'', "id":'index'}]+[{"name":i, "id":i, "type":'numeric', 'format': Format(group=',')} for i in list(current_df.reset_index().columns)[1:]],
         data = current_df.reset_index().to_dict(orient='records'),
 
     )
@@ -673,367 +980,6 @@ def toggle_collapse(n, is_open):
 
     return is_open
 
-
-#Remove button submit reset
-@app.callback(Output('submit_0', 'n_clicks'),[Input('remove_0', 'n_clicks')])
-def reset_remove_clicks(n):
-    if n:
-        return None
-    else:
-        return None
-@app.callback(Output('submit_1', 'n_clicks'),[Input('remove_1', 'n_clicks')])
-def reset_remove_clicks(n):
-    if n:
-        return None
-    else:
-        return None
-@app.callback(Output('submit_2', 'n_clicks'),[Input('remove_2', 'n_clicks')])
-def reset_remove_clicks(n):
-    if n:
-        return None
-    else:
-        return None
-@app.callback(Output('submit_3', 'n_clicks'),[Input('remove_3', 'n_clicks')])
-def reset_remove_clicks(n):
-    if n:
-        return None
-    else:
-        return None
-@app.callback(Output('submit_4', 'n_clicks'),[Input('remove_4', 'n_clicks')])
-def reset_remove_clicks(n):
-    if n:
-        return None
-    else:
-        return None
-@app.callback(Output('submit_5', 'n_clicks'),[Input('remove_5', 'n_clicks')])
-def reset_remove_clicks(n):
-    if n:
-        return None
-    else:
-        return None
-@app.callback(Output('submit_6', 'n_clicks'),[Input('remove_6', 'n_clicks')])
-def reset_remove_clicks(n):
-    if n:
-        return None
-    else:
-        return None
-@app.callback(Output('submit_7', 'n_clicks'),[Input('remove_7', 'n_clicks')])
-def reset_remove_clicks(n):
-    if n:
-        return None
-    else:
-        return None
-@app.callback(Output('submit_8', 'n_clicks'),[Input('remove_8', 'n_clicks')])
-def reset_remove_clicks(n):
-    if n:
-        return None
-    else:
-        return None
-@app.callback(Output('submit_9', 'n_clicks'),[Input('remove_9', 'n_clicks')])
-def reset_remove_clicks(n):
-    if n:
-        return None
-    else:
-        return None
-
-#Submit button add more entries
-@app.callback(create_outputs_change_disabled(1)+create_outputs_change_visibility(2)+[Output('remove_0', 'disabled')],
-              [Input('submit_0','n_clicks'),Input('remove_0','n_clicks')])
-def incremental_change(n1,n2):
-    if n1:
-        l = [False]*10
-        options = [
-            {"label": "Conservative", "value": 'conservative', "disabled": False},
-            {"label": "Standard", "value": 'standard', "disabled": False}
-        ]
-        l = l+[options]
-        l = l+[{'display':'block'}]
-        l = l+[False]
-        return l
-    elif n2:
-        l = [True]*10
-        options = [
-            {"label": "Conservative", "value": 'conservative', "disabled": True},
-            {"label": "Standard", "value": 'standard', "disabled": True}
-        ]
-        l = l+[options]
-        l = l+[{'display':'none'}]
-        l = l+[True]
-        return l
-    else:
-        l = [True] * 10
-        options = [
-            {"label": "Conservative", "value": 'conservative', "disabled": True},
-            {"label": "Standard", "value": 'standard', "disabled": True}
-        ]
-        l = l + [options]
-        l = l + [{'display': 'none'}]
-        l = l + [True]
-        return l
-@app.callback(create_outputs_change_disabled(2)+create_outputs_change_visibility(3)+[Output('remove_1', 'disabled')],
-              [Input('submit_1','n_clicks'),Input('remove_1', 'n_clicks')])
-def incremental_change(n1,n2):
-    if n1:
-        l = [False]*10
-        options = [
-            {"label": "Conservative", "value": 'conservative', "disabled": False},
-            {"label": "Standard", "value": 'standard', "disabled": False}
-        ]
-        l = l+[options]
-        l = l+[{'display':'block'}]
-        l = l+[False]
-        return l
-    elif n2:
-        l = [True]*10
-        options = [
-            {"label": "Conservative", "value": 'conservative', "disabled": True},
-            {"label": "Standard", "value": 'standard', "disabled": True}
-        ]
-        l = l+[options]
-        l = l+[{'display':'none'}]
-        l = l+[True]
-        return l
-    else:
-        l = [True] * 10
-        options = [
-            {"label": "Conservative", "value": 'conservative', "disabled": True},
-            {"label": "Standard", "value": 'standard', "disabled": True}
-        ]
-        l = l + [options]
-        l = l + [{'display': 'none'}]
-        l = l + [True]
-        return l
-@app.callback(create_outputs_change_disabled(3)+create_outputs_change_visibility(4)+[Output('remove_2', 'disabled')],
-              [Input('submit_2','n_clicks'),Input('remove_2', 'n_clicks')])
-def incremental_change(n1,n2):
-    if n1:
-        l = [False]*10
-        options = [
-            {"label": "Conservative", "value": 'conservative', "disabled": False},
-            {"label": "Standard", "value": 'standard', "disabled": False}
-        ]
-        l = l+[options]
-        l = l+[{'display':'block'}]
-        l = l+[False]
-        return l
-    elif n2:
-        l = [True]*10
-        options = [
-            {"label": "Conservative", "value": 'conservative', "disabled": True},
-            {"label": "Standard", "value": 'standard', "disabled": True}
-        ]
-        l = l+[options]
-        l = l+[{'display':'none'}]
-        l = l+[True]
-        return l
-    else:
-        l = [True] * 10
-        options = [
-            {"label": "Conservative", "value": 'conservative', "disabled": True},
-            {"label": "Standard", "value": 'standard', "disabled": True}
-        ]
-        l = l + [options]
-        l = l + [{'display': 'none'}]
-        l = l + [True]
-        return l
-
-@app.callback(create_outputs_change_disabled(4)+create_outputs_change_visibility(5)+[Output('remove_3', 'disabled')],
-              [Input('submit_3','n_clicks'),Input('remove_3', 'n_clicks')])
-def incremental_change(n1,n2):
-    if n1:
-        l = [False]*10
-        options = [
-            {"label": "Conservative", "value": 'conservative', "disabled": False},
-            {"label": "Standard", "value": 'standard', "disabled": False}
-        ]
-        l = l+[options]
-        l = l+[{'display':'block'}]
-        l = l+[False]
-        return l
-    elif n2:
-        l = [True]*10
-        options = [
-            {"label": "Conservative", "value": 'conservative', "disabled": True},
-            {"label": "Standard", "value": 'standard', "disabled": True}
-        ]
-        l = l+[options]
-        l = l+[{'display':'none'}]
-        l = l+[True]
-        return l
-    else:
-        l = [True] * 10
-        options = [
-            {"label": "Conservative", "value": 'conservative', "disabled": True},
-            {"label": "Standard", "value": 'standard', "disabled": True}
-        ]
-        l = l + [options]
-        l = l + [{'display': 'none'}]
-        l = l + [True]
-        return l
-@app.callback(create_outputs_change_disabled(5)+create_outputs_change_visibility(6)+[Output('remove_4', 'disabled')],
-              [Input('submit_4','n_clicks'),Input('remove_4', 'n_clicks')])
-def incremental_change(n1,n2):
-    if n1:
-        l = [False]*10
-        options = [
-            {"label": "Conservative", "value": 'conservative', "disabled": False},
-            {"label": "Standard", "value": 'standard', "disabled": False}
-        ]
-        l = l+[options]
-        l = l+[{'display':'block'}]
-        l = l+[False]
-        return l
-    elif n2:
-        l = [True]*10
-        options = [
-            {"label": "Conservative", "value": 'conservative', "disabled": True},
-            {"label": "Standard", "value": 'standard', "disabled": True}
-        ]
-        l = l+[options]
-        l = l+[{'display':'none'}]
-        l = l+[True]
-        return l
-    else:
-        l = [True] * 10
-        options = [
-            {"label": "Conservative", "value": 'conservative', "disabled": True},
-            {"label": "Standard", "value": 'standard', "disabled": True}
-        ]
-        l = l + [options]
-        l = l + [{'display': 'none'}]
-        l = l + [True]
-        return l
-@app.callback(create_outputs_change_disabled(6)+create_outputs_change_visibility(7)+[Output('remove_5', 'disabled')],
-              [Input('submit_5','n_clicks'),Input('remove_5', 'n_clicks')])
-def incremental_change(n1,n2):
-    if n1:
-        l = [False]*10
-        options = [
-            {"label": "Conservative", "value": 'conservative', "disabled": False},
-            {"label": "Standard", "value": 'standard', "disabled": False}
-        ]
-        l = l+[options]
-        l = l+[{'display':'block'}]
-        l = l+[False]
-        return l
-    elif n2:
-        l = [True]*10
-        options = [
-            {"label": "Conservative", "value": 'conservative', "disabled": True},
-            {"label": "Standard", "value": 'standard', "disabled": True}
-        ]
-        l = l+[options]
-        l = l+[{'display':'none'}]
-        l = l+[True]
-        return l
-    else:
-        l = [True] * 10
-        options = [
-            {"label": "Conservative", "value": 'conservative', "disabled": True},
-            {"label": "Standard", "value": 'standard', "disabled": True}
-        ]
-        l = l + [options]
-        l = l + [{'display': 'none'}]
-        l = l + [True]
-        return l
-@app.callback(create_outputs_change_disabled(7)+create_outputs_change_visibility(8)+[Output('remove_6', 'disabled')],
-              [Input('submit_6','n_clicks'),Input('remove_6', 'n_clicks')])
-def incremental_change(n1,n2):
-    if n1:
-        l = [False]*10
-        options = [
-            {"label": "Conservative", "value": 'conservative', "disabled": False},
-            {"label": "Standard", "value": 'standard', "disabled": False}
-        ]
-        l = l+[options]
-        l = l+[{'display':'block'}]
-        l = l+[False]
-        return l
-    elif n2:
-        l = [True]*10
-        options = [
-            {"label": "Conservative", "value": 'conservative', "disabled": True},
-            {"label": "Standard", "value": 'standard', "disabled": True}
-        ]
-        l = l+[options]
-        l = l+[{'display':'none'}]
-        l = l+[True]
-        return l
-    else:
-        l = [True] * 10
-        options = [
-            {"label": "Conservative", "value": 'conservative', "disabled": True},
-            {"label": "Standard", "value": 'standard', "disabled": True}
-        ]
-        l = l + [options]
-        l = l + [{'display': 'none'}]
-        l = l + [True]
-        return l
-@app.callback(create_outputs_change_disabled(8)+create_outputs_change_visibility(9)+[Output('remove_7', 'disabled')],
-              [Input('submit_7','n_clicks'),Input('remove_7', 'n_clicks')])
-def incremental_change(n1,n2):
-    if n1:
-        l = [False]*10
-        options = [
-            {"label": "Conservative", "value": 'conservative', "disabled": False},
-            {"label": "Standard", "value": 'standard', "disabled": False}
-        ]
-        l = l+[options]
-        l = l+[{'display':'block'}]
-        l = l+[False]
-        return l
-    elif n2:
-        l = [True]*10
-        options = [
-            {"label": "Conservative", "value": 'conservative', "disabled": True},
-            {"label": "Standard", "value": 'standard', "disabled": True}
-        ]
-        l = l+[options]
-        l = l+[{'display':'none'}]
-        l = l+[True]
-        return l
-    else:
-        l = [True] * 10
-        options = [
-            {"label": "Conservative", "value": 'conservative', "disabled": True},
-            {"label": "Standard", "value": 'standard', "disabled": True}
-        ]
-        l = l + [options]
-        l = l + [{'display': 'none'}]
-        l = l + [True]
-        return l
-@app.callback(create_outputs_change_disabled(9)+[Output('remove_8', 'disabled')],
-              [Input('submit_8','n_clicks'),Input('remove_8', 'n_clicks')])
-def incremental_change(n1,n2):
-    if n1:
-        l = [False]*10
-        options = [
-            {"label": "Conservative", "value": 'conservative', "disabled": False},
-            {"label": "Standard", "value": 'standard', "disabled": False}
-        ]
-        l = l+[options]
-        l = l+[False]
-        return l
-    elif n2:
-        l = [True]*10
-        options = [
-            {"label": "Conservative", "value": 'conservative', "disabled": True},
-            {"label": "Standard", "value": 'standard', "disabled": True}
-        ]
-        l = l+[options]
-        l = l+[True]
-        return l
-    else:
-        l = [True] * 10
-        options = [
-            {"label": "Conservative", "value": 'conservative', "disabled": True},
-            {"label": "Standard", "value": 'standard', "disabled": True}
-        ]
-        l = l + [options]
-        l = l + [True]
-        return l
-
-#Submit button add DC objects
 
 
 if __name__ == '__main__':
