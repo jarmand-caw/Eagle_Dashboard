@@ -249,314 +249,282 @@ data_centers[1] = dc1
 
 def create_input_group(number, disabled,visible):
     a = html.Div([
-        dbc.Card([
-        dbc.CardHeader('Datacenter ' + str(number + 1)),
-        dbc.Col([
-            dbc.Container([
-                dbc.FormGroup([
-                    dbc.Label('Select Quarter'),
-                    dbc.Select(options=quarter_dropdown_options, value=None, disabled=disabled, id='select_'+str(number))
-                ])
-            ])
-        ]),
-        dbc.Col([
-            dbc.Container([
-                dbc.FormGroup([
-                    dbc.Label('Power Capacity (kw)'),
-                    dbc.Input(
-                        placeholder='3000',
-                        type='number',
-                        id='power_capacity_' + str(number),
-                        persistence=True,
-                        persistence_type='session',
-                        disabled=disabled,
-                        value=3000
-                    )
-                ])
-            ])
-        ]),
-        dbc.Col([
-            dbc.Container([
-                dbc.FormGroup([
-                    dbc.Label('Square Footage'),
-                    dbc.Input(
-                        placeholder='27,871',
-                        type='number',
-                        id='sqft_' + str(number),
-                        persistence=True,
-                        persistence_type='session',
-                        disabled=disabled,
-                        value=27971
-                    )
-                ])
-            ])
-        ]),
-        dbc.Col([
-            dbc.Container([
-                dbc.FormGroup([
-                    dbc.Label('Percent of Capacity Filled Currently'),
-                    dbc.Input(
-                        placeholder='0%',
-                        type='number',
-                        id='current_percent_' + str(number),
-                        persistence=True,
-                        persistence_type='session',
-                        disabled=disabled,
-                        value=0
-                    )
-                ])
-            ])
-        ]),
-        dbc.Col([
-            dbc.Container([
-                dbc.FormGroup([
-                    dbc.Label('Growth Curve'),
-                    dbc.RadioItems(
-                        options=[
-                            {"label": "Conservative", "value": 'conservative', "disabled": disabled},
-                            {"label": "Standard", "value": 'standard', "disabled": disabled}
-                        ],
-                        value='conservative',
-                        id='growth_curve_' + str(number),
-                        persistence=True,
-                        persistence_type='session',
-                    )
-                ])
-            ])
-        ]),
-        dbc.Col([
-            dbc.Container([
-                dbc.Button('Advanced Options', color='secondary', disabled=disabled, block=True, id='advanced_'+str(number))
-            ]),
-            dbc.Collapse([
-                dbc.Col([
-                    dbc.Container([
-                        dbc.FormGroup([
-                            dbc.Label('Utility cost per kw/hr'),
-                            dbc.Input(
-                                placeholder='$0.13',
-                                type='number',
-                                id='utility_' + str(number),
-                                persistence=True,
-                                persistence_type='session',
-                                disabled=disabled,
-                                value=0.13
-                            )
+        dbc.Row([
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardHeader('Datacenter ' + str(number + 1)),
+                    dbc.CardBody([
+                        dbc.Row([
+                            dbc.Col([dbc.Label('Select Quarter')]),
+                            dbc.Col([dbc.Label('Power Capacity (kw)')]),
+                            dbc.Col([dbc.Label('Square Footage')]),
+                            dbc.Col([dbc.Label('Current % of Capacity Filled')]),
+                            dbc.Col([dbc.Label('Growth Curve')]),
+                        ]),
+                        dbc.Row([
+                            dbc.Col([
+                                dbc.Select(options=quarter_dropdown_options, value=None, disabled=disabled,
+                                           id='select_' + str(number))
+                            ]),
+                            dbc.Col([
+                                dbc.Input(
+                                    placeholder='3000',
+                                    type='number',
+                                    id='power_capacity_' + str(number),
+                                    persistence=True,
+                                    persistence_type='session',
+                                    disabled=disabled,
+                                    value=3000
+                                )
+                            ]),
+                            dbc.Col([
+                                dbc.Input(
+                                    placeholder='27,871',
+                                    type='number',
+                                    id='sqft_' + str(number),
+                                    persistence=True,
+                                    persistence_type='session',
+                                    disabled=disabled,
+                                    value=27971
+                                )
+                            ]),
+                            dbc.Col([
+                                dbc.Input(
+                                    placeholder='0%',
+                                    type='number',
+                                    id='current_percent_' + str(number),
+                                    persistence=True,
+                                    persistence_type='session',
+                                    disabled=disabled,
+                                    value=0
+                                )
+                            ]),
+                            dbc.Col([
+                                dbc.RadioItems(
+                                    options=[
+                                        {"label": "Conservative", "value": 'conservative',
+                                         "disabled": disabled},
+                                        {"label": "Standard", "value": 'standard', "disabled": disabled}
+                                    ],
+                                    value='conservative',
+                                    id='growth_curve_' + str(number),
+                                    persistence=True,
+                                    persistence_type='session',
+                                )
+                            ]),
+                        ]),
+                                    dbc.Row([
+                                        dbc.Col([
+                                            dbc.Button('Advanced Options', color='primary', disabled=disabled,
+                                                       block=True, id='advanced_' + str(number))
+                                        ])]),
+                                    dbc.Row([
+                                        dbc.Col([
+                                            dbc.Collapse([
+                                                dbc.Row([
+                                                    dbc.Col([dbc.Label('Utility cost per kw/hr')]),
+                                                    dbc.Col([dbc.Label('Rent per sqft')]),
+                                                    dbc.Col([dbc.Label('Usage Rate')]),
+                                                    dbc.Col([dbc.Label('Monthly revenue per kw')])
+                                                ]),
+                                                dbc.Row([
+                                                    dbc.Col([
+                                                        dbc.Input(
+                                                            placeholder='$0.13',
+                                                            type='number',
+                                                            id='utility_' + str(number),
+                                                            persistence=True,
+                                                            persistence_type='session',
+                                                            disabled=disabled,
+                                                            value=0.13
+                                                        )
+                                                    ]),
+                                                    dbc.Col([
+                                                            dbc.Input(
+                                                                placeholder='31',
+                                                                type='number',
+                                                                id='rent_' + str(number),
+                                                                persistence=True,
+                                                                persistence_type='session',
+                                                                disabled=disabled,
+                                                                value=31
+                                                            )
+                                                    ]),
+                                                    dbc.Col([
+                                                        dbc.Input(
+                                                            placeholder='0.7',
+                                                            type='number',
+                                                            id='usage_' + str(number),
+                                                            persistence=True,
+                                                            persistence_type='session',
+                                                            disabled=disabled,
+                                                            value=0.7
+                                                        )
+                                                    ]),
+                                                    dbc.Col([
+                                                        dbc.Input(
+                                                            placeholder='160',
+                                                            type='number',
+                                                            id='kw_revenue_' + str(number),
+                                                            persistence=True,
+                                                            persistence_type='session',
+                                                            disabled=disabled,
+                                                            value=160
+                                                        )
+                                                    ])
+                                                ])
+                                            ],id='collapse_' + str(number)),
+                                            ])
+                                        ]),
+                            dbc.Row([
+                                    dbc.Col([
+                                        dbc.Button('Remove', color='secondary', disabled=disabled, block=True,
+                                                    id='remove_' + str(number))
+                                        ])
+                            ])
                         ])
-                    ])
-                ]),
-                dbc.Col([
-                    dbc.Container([
-                        dbc.FormGroup([
-                            dbc.Label('Rent per sqft'),
-                            dbc.Input(
-                                placeholder='31',
-                                type='number',
-                                id='rent_' + str(number),
-                                persistence=True,
-                                persistence_type='session',
-                                disabled=disabled,
-                                value=31
-                            )
-                        ])
-                    ])
-                ]),
-                dbc.Col([
-                    dbc.Container([
-                        dbc.FormGroup([
-                            dbc.Label('Usage Rate'),
-                            dbc.Input(
-                                placeholder='0.7',
-                                type='number',
-                                id='usage_' + str(number),
-                                persistence=True,
-                                persistence_type='session',
-                                disabled=disabled,
-                                value=0.7
-                            )
-                        ])
-                    ])
-                ]),
-                dbc.Col([
-                    dbc.Container([
-                        dbc.FormGroup([
-                            dbc.Label('Monthly revenue per kw'),
-                            dbc.Input(
-                                placeholder='160',
-                                type='number',
-                                id='kw_revenue_' + str(number),
-                                persistence=True,
-                                persistence_type='session',
-                                disabled=disabled,
-                                value=160
-                            )
-                        ])
-                    ])
-                ]),
-            ], id='collapse_'+str(number))
-        ]),
-        dbc.Col([
-            dbc.Container([
-                dbc.Button('Remove', color='warning', disabled=disabled, block=True, id='remove_' + str(number))
-            ])
-        ])
-    ])
+                    ])])
+                ])
     ], style={'display':visible}, id='div'+str(i))
     return a
 
 def create_input_group_no_div(number, disabled,visible):
-    a = dbc.Card([
-        dbc.CardHeader('Datacenter ' + str(number + 1)),
-        dbc.Col([
-            dbc.Container([
-                dbc.FormGroup([
-                    dbc.Label('Select Quarter'),
-                    dbc.Select(options=quarter_dropdown_options, value=None, disabled=disabled, id='select_'+str(number))
-                ])
-            ])
-        ]),
-        dbc.Col([
-            dbc.Container([
-                dbc.FormGroup([
-                    dbc.Label('Power Capacity (kw)'),
-                    dbc.Input(
-                        placeholder='3000',
-                        type='number',
-                        id='power_capacity_' + str(number),
-                        persistence=True,
-                        persistence_type='session',
-                        disabled=disabled,
-                        value=3000
-                    )
-                ])
-            ])
-        ]),
-        dbc.Col([
-            dbc.Container([
-                dbc.FormGroup([
-                    dbc.Label('Square Footage'),
-                    dbc.Input(
-                        placeholder='27,871',
-                        type='number',
-                        id='sqft_' + str(number),
-                        persistence=True,
-                        persistence_type='session',
-                        disabled=disabled,
-                        value=27971
-                    )
-                ])
-            ])
-        ]),
-        dbc.Col([
-            dbc.Container([
-                dbc.FormGroup([
-                    dbc.Label('Percent of Capacity Filled Currently'),
-                    dbc.Input(
-                        placeholder='0%',
-                        type='number',
-                        id='current_percent_' + str(number),
-                        persistence=True,
-                        persistence_type='session',
-                        disabled=disabled,
-                        value=0
-                    )
-                ])
-            ])
-        ]),
-        dbc.Col([
-            dbc.Container([
-                dbc.FormGroup([
-                    dbc.Label('Growth Curve'),
-                    dbc.RadioItems(
-                        options=[
-                            {"label": "Conservative", "value": 'conservative', "disabled": disabled},
-                            {"label": "Standard", "value": 'standard', "disabled": disabled}
-                        ],
-                        value='conservative',
-                        id='growth_curve_' + str(number),
-                        persistence=True,
-                        persistence_type='session',
-                    )
-                ])
-            ])
-        ]),
-        dbc.Col([
-            dbc.Container([
-                dbc.Button('Advanced Options', color='secondary', disabled=disabled, block=True, id='advanced_'+str(number))
-            ]),
-            dbc.Collapse([
-                dbc.Col([
-                    dbc.Container([
-                        dbc.FormGroup([
-                            dbc.Label('Utility cost per kw/hr'),
-                            dbc.Input(
-                                placeholder='$0.13',
-                                type='number',
-                                id='utility_' + str(number),
-                                persistence=True,
-                                persistence_type='session',
-                                disabled=disabled,
-                                value=0.13
-                            )
+    a = dbc.Row([
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardHeader('Datacenter ' + str(number + 1)),
+                    dbc.CardBody([
+                        dbc.Row([
+                            dbc.Col([dbc.Label('Select Quarter')]),
+                            dbc.Col([dbc.Label('Power Capacity (kw)')]),
+                            dbc.Col([dbc.Label('Square Footage')]),
+                            dbc.Col([dbc.Label('Current % of Capacity Filled')]),
+                            dbc.Col([dbc.Label('Growth Curve')]),
+                        ]),
+                        dbc.Row([
+                            dbc.Col([
+                                dbc.Select(options=quarter_dropdown_options, value=None, disabled=disabled,
+                                           id='select_' + str(number))
+                            ]),
+                            dbc.Col([
+                                dbc.Input(
+                                    placeholder='3000',
+                                    type='number',
+                                    id='power_capacity_' + str(number),
+                                    persistence=True,
+                                    persistence_type='session',
+                                    disabled=disabled,
+                                    value=3000
+                                )
+                            ]),
+                            dbc.Col([
+                                dbc.Input(
+                                    placeholder='27,871',
+                                    type='number',
+                                    id='sqft_' + str(number),
+                                    persistence=True,
+                                    persistence_type='session',
+                                    disabled=disabled,
+                                    value=27971
+                                )
+                            ]),
+                            dbc.Col([
+                                dbc.Input(
+                                    placeholder='0%',
+                                    type='number',
+                                    id='current_percent_' + str(number),
+                                    persistence=True,
+                                    persistence_type='session',
+                                    disabled=disabled,
+                                    value=0
+                                )
+                            ]),
+                            dbc.Col([
+                                dbc.RadioItems(
+                                    options=[
+                                        {"label": "Conservative", "value": 'conservative',
+                                         "disabled": disabled},
+                                        {"label": "Standard", "value": 'standard', "disabled": disabled}
+                                    ],
+                                    value='conservative',
+                                    id='growth_curve_' + str(number),
+                                    persistence=True,
+                                    persistence_type='session',
+                                )
+                            ]),
+                        ]),
+                                    dbc.Row([
+                                        dbc.Col([
+                                            dbc.Button('Advanced Options', color='primary', disabled=disabled,
+                                                       block=True, id='advanced_' + str(number))
+                                        ])]),
+                                    dbc.Row([
+                                        dbc.Col([
+                                            dbc.Collapse([
+                                                dbc.Row([
+                                                    dbc.Col([dbc.Label('Utility cost per kw/hr')]),
+                                                    dbc.Col([dbc.Label('Rent per sqft')]),
+                                                    dbc.Col([dbc.Label('Usage Rate')]),
+                                                    dbc.Col([dbc.Label('Monthly revenue per kw')])
+                                                ]),
+                                                dbc.Row([
+                                                    dbc.Col([
+                                                        dbc.Input(
+                                                            placeholder='$0.13',
+                                                            type='number',
+                                                            id='utility_' + str(number),
+                                                            persistence=True,
+                                                            persistence_type='session',
+                                                            disabled=disabled,
+                                                            value=0.13
+                                                        )
+                                                    ]),
+                                                    dbc.Col([
+                                                            dbc.Input(
+                                                                placeholder='31',
+                                                                type='number',
+                                                                id='rent_' + str(number),
+                                                                persistence=True,
+                                                                persistence_type='session',
+                                                                disabled=disabled,
+                                                                value=31
+                                                            )
+                                                    ]),
+                                                    dbc.Col([
+                                                        dbc.Input(
+                                                            placeholder='0.7',
+                                                            type='number',
+                                                            id='usage_' + str(number),
+                                                            persistence=True,
+                                                            persistence_type='session',
+                                                            disabled=disabled,
+                                                            value=0.7
+                                                        )
+                                                    ]),
+                                                    dbc.Col([
+                                                        dbc.Input(
+                                                            placeholder='160',
+                                                            type='number',
+                                                            id='kw_revenue_' + str(number),
+                                                            persistence=True,
+                                                            persistence_type='session',
+                                                            disabled=disabled,
+                                                            value=160
+                                                        )
+                                                    ])
+                                                ])
+                                            ],id='collapse_' + str(number)),
+                                            ])
+                                        ]),
+                            dbc.Row([
+                                    dbc.Col([
+                                        dbc.Button('Remove', color='secondary', disabled=disabled, block=True,
+                                                    id='remove_' + str(number))
+                                        ])
+                            ])
                         ])
-                    ])
-                ]),
-                dbc.Col([
-                    dbc.Container([
-                        dbc.FormGroup([
-                            dbc.Label('Rent per sqft'),
-                            dbc.Input(
-                                placeholder='31',
-                                type='number',
-                                id='rent_' + str(number),
-                                persistence=True,
-                                persistence_type='session',
-                                disabled=disabled,
-                                value=31
-                            )
-                        ])
-                    ])
-                ]),
-                dbc.Col([
-                    dbc.Container([
-                        dbc.FormGroup([
-                            dbc.Label('Usage Rate'),
-                            dbc.Input(
-                                placeholder='0.7',
-                                type='number',
-                                id='usage_' + str(number),
-                                persistence=True,
-                                persistence_type='session',
-                                disabled=disabled,
-                                value=0.7
-                            )
-                        ])
-                    ])
-                ]),
-                dbc.Col([
-                    dbc.Container([
-                        dbc.FormGroup([
-                            dbc.Label('Monthly revenue per kw'),
-                            dbc.Input(
-                                placeholder='160',
-                                type='number',
-                                id='kw_revenue_' + str(number),
-                                persistence=True,
-                                persistence_type='session',
-                                disabled=disabled,
-                                value=160
-                            )
-                        ])
-                    ])
-                ]),
-            ], id='collapse_'+str(number))
-        ]),
-        dbc.Col([
-            dbc.Container([
-                dbc.Button('Remove', color='warning', disabled=disabled, block=True, id='remove_' + str(number))
-            ])
-        ])
-    ])
+                    ])])
+                ])
     return a
 
 
@@ -634,27 +602,58 @@ app.layout = dbc.Tabs([
                         'You can adjust key metrics and add data centers here. For more advanced options, click on the advanced dropdown menu')
                 ])
             ]),
-            dbc.Row(dbc.Col(dbc.Button('Submit', id='big_sub', block=True, color='primary'))),
-            dbc.Row([dbc.Col(dbc.Button('Add Data Center', id='plus', block=True, color='success'))]),
-            dbc.Row(html.P('')),
-            dbc.Row(
-                inputs, id='input_row', align='center', justify='center')
+            dbc.Row([
+                dbc.Col(
+                        inputs
+                ,width=8, id='input_row', align='center'),
+                dbc.Col([
+                    dbc.Row(dbc.Col([
+                        dbc.Jumbotron([
+                            html.H2("", id='value_header')
+                        ])
+                    ])),
+                    dbc.Row(dbc.Col(dbc.Button('Submit', id='big_sub', block=True, color='success', size='lg'))),
+                    dbc.Row(dbc.Col(html.P(''))),
+                    dbc.Row([dbc.Col(dbc.Button('Add Data Center', id='plus', block=True, color='primary', size='lg'))]),
+                ]),
+
+            ])
         ]),
-        html.Div(children=final_df.to_json(),id='intermediate-value', style={'display': 'none'})
+        html.Div(children=[],id='intermediate-value', style={'display': 'none'})
     ], label='Input', tab_id='input'),
     dbc.Tab([
+        dbc.Row([
+            dbc.Col([
+            dbc.CardGroup([
+                dbc.Card([
+                    html.H1('Valuation'),
+                    html.H3("",id='proj_value')
+                ]),
+                dbc.Card([
+                    html.H1('Required Investment'),
+                    html.H3("",id='proj_invest')
+                ]),
+                dbc.Card([
+                    html.H1('ROI'),
+                    html.H3("",id='proj_roi')
+                ])
+            ])
+        ])
+        ]),
         dbc.Row([dbc.Col([dbc.Container([], id='proj')])])
     ], label='Projected Financials', tab_id='proj'),
     dbc.Tab([
         dbc.Container([
             dash_table.DataTable(
-            id='table',
-            style_cell={
-                'whiteSpace': 'normal',
-                'height': 'auto',
-            },
-            columns = [{"name":i, "id":i} for i in list(opp_df.columns)],
-            data = opp_df.to_dict(orient='records')
+                id='table',
+                style_cell={
+                    'whiteSpace': 'normal',
+                    'height': 'auto',
+                },
+                columns = [{"name":i, "id":i} for i in list(opp_df.columns)],
+                data = opp_df.to_dict(orient='records'),
+                filter_action='native',
+                sort_action='native'
             )
         ])
     ], label='Current Sourced Opportunities', tab_id='opp')
@@ -680,6 +679,14 @@ for x in range(10):
 all_style_inputs = []
 for x in range(10):
     all_style_inputs+=create_inputs_change_visibility_reset(x)
+
+def create_collapse_opens(num):
+    name = 'collapse_'+str(num)
+    out = Output(name,'is_open')
+    return out
+all_collapse_opens = []
+for x in range(10):
+    all_collapse_opens.append(create_collapse_opens(x))
 #Change the graph
 
 @app.callback(Output('plus', 'n_clicks'),
@@ -844,6 +851,41 @@ def update_df(*args):
         return json
     else:
         return final_df.to_json()
+
+@app.callback([Output('value_header', 'children'),
+               Output('proj_value', 'children'),
+               Output('proj_invest', 'children'),
+               Output('proj_roi', 'children')],
+              [Input('intermediate-value','children')])
+def update_value(json):
+    df = pd.read_json(json, convert_dates=False, convert_axes=False)
+    df = df.astype(int)
+    a = df.loc['EBITDA'].values
+    cumsum = np.cumsum(a)
+    invest = cumsum.min()
+
+    a = list(a)
+    disc = []
+    for x in range(len(a)):
+        disc.append(a[x]/(1.021**x))
+    disc = np.array(disc)
+    sum = disc.sum()
+
+    tv = np.array(a[-4:]).sum()*24.1
+    tv = tv/(1.085**5)
+    sum = sum+tv
+
+    roi = sum/invest
+
+    value_form = f'${round(sum/1000000,1)}M'
+    value_string = "Valuation: {0}".format(value_form)
+    roi_form = f"{round(roi,1)}x"
+    roi_string = "ROI: {0}".format(roi_form)
+    invest_form = f"${round(invest/1000000,1)}M"
+    invest_string = "Required Investment: {0}".format(invest_form)
+
+    return value_string, value_form, invest_form, roi_form
+
 @app.callback(Output('proj', 'children'),
               [Input('intermediate-value','children')]
 )
@@ -871,9 +913,11 @@ def run_graph(json):
 )
 def toggle_collapse(n,is_open):
     if n:
-        return not is_open
+        if n%2==1:
+            return True
+        else:
+            return False
     return is_open
-
 
 @app.callback(
     Output("collapse_1", "is_open"),
@@ -882,7 +926,10 @@ def toggle_collapse(n,is_open):
 )
 def toggle_collapse(n, is_open):
     if n:
-        return not is_open
+        if n % 2 == 1:
+            return True
+        else:
+            return False
     return is_open
 
 
@@ -893,7 +940,10 @@ def toggle_collapse(n, is_open):
 )
 def toggle_collapse(n, is_open):
     if n:
-        return not is_open
+        if n % 2 == 1:
+            return True
+        else:
+            return False
     return is_open
 
 
@@ -904,10 +954,11 @@ def toggle_collapse(n, is_open):
 )
 def toggle_collapse(n, is_open):
     if n:
-        return not is_open
-
+        if n % 2 == 1:
+            return True
+        else:
+            return False
     return is_open
-
 
 @app.callback(
     Output("collapse_4", "is_open"),
@@ -916,8 +967,10 @@ def toggle_collapse(n, is_open):
 )
 def toggle_collapse(n, is_open):
     if n:
-        return not is_open
-
+        if n % 2 == 1:
+            return True
+        else:
+            return False
     return is_open
 
 
@@ -928,8 +981,10 @@ def toggle_collapse(n, is_open):
 )
 def toggle_collapse(n, is_open):
     if n:
-        return not is_open
-
+        if n % 2 == 1:
+            return True
+        else:
+            return False
     return is_open
 
 
@@ -940,8 +995,10 @@ def toggle_collapse(n, is_open):
 )
 def toggle_collapse(n, is_open):
     if n:
-        return not is_open
-
+        if n % 2 == 1:
+            return True
+        else:
+            return False
     return is_open
 
 
@@ -952,8 +1009,10 @@ def toggle_collapse(n, is_open):
 )
 def toggle_collapse(n, is_open):
     if n:
-        return not is_open
-
+        if n % 2 == 1:
+            return True
+        else:
+            return False
     return is_open
 
 
@@ -964,8 +1023,10 @@ def toggle_collapse(n, is_open):
 )
 def toggle_collapse(n, is_open):
     if n:
-        return not is_open
-
+        if n % 2 == 1:
+            return True
+        else:
+            return False
     return is_open
 
 
@@ -976,8 +1037,10 @@ def toggle_collapse(n, is_open):
 )
 def toggle_collapse(n, is_open):
     if n:
-        return not is_open
-
+        if n % 2 == 1:
+            return True
+        else:
+            return False
     return is_open
 
 
