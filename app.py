@@ -969,7 +969,7 @@ def reset(style, current):
 def update_df(*args):
     input_names = [item.component_id for item in big_sub_input + all_states]
     kwargs = dict(zip(input_names, args))
-    array = np.zeros([6,21])
+    array = np.zeros([len(final_df),21])
     count = 0
     for x in range(10):
         name = 'select_'+str(x)
