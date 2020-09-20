@@ -213,7 +213,7 @@ VALID_USERNAME_PASSWORD_PAIRS = {
     'HawkWoodGroup': 'project_eagle'
 }
 
-app = dash.Dash(__name__, external_stylesheets=[dbc.themes.COSMO])
+app = dash.Dash(__name__, external_stylesheets=[dbc.themes.FLATLY])
 
 auth = dash_auth.BasicAuth(
     app,
@@ -599,7 +599,8 @@ app.layout = dbc.Tabs([
             dbc.Row([
                 dbc.Col([
                     html.H5(
-                        'You can adjust key metrics and add data centers here. For more advanced options, click on the advanced dropdown menu')
+                        'You can adjust key metrics and add data centers here. For more advanced options, click on the advanced dropdown menu'),
+                    html.Hr()
                 ])
             ]),
             dbc.Row([
@@ -624,23 +625,71 @@ app.layout = dbc.Tabs([
     dbc.Tab([
         dbc.Row([
             dbc.Col([
-            dbc.CardGroup([
-                dbc.Card([
-                    html.H1('Valuation'),
-                    html.H3("",id='proj_value')
-                ]),
-                dbc.Card([
-                    html.H1('Required Investment'),
-                    html.H3("",id='proj_invest')
-                ]),
-                dbc.Card([
-                    html.H1('ROI'),
-                    html.H3("",id='proj_roi')
+                dbc.Container([
+                    html.H1('Key Performance Indicators'),
+                    html.Hr()
                 ])
             ])
-        ])
         ]),
-        dbc.Row([dbc.Col([dbc.Container([], id='proj')])])
+        dbc.Row([
+            dbc.Col([
+                dbc.Container([
+                    dbc.CardDeck([
+                        dbc.Card([
+                            dbc.Container([
+                                html.H2('Valuation'),
+                                html.H3("",id='proj_value')
+                            ], fluid=True)
+                        ], color='primary', inverse=True),
+                        dbc.Card([
+                            dbc.Container([
+                                html.H2('Required Investment'),
+                                html.H3("",id='proj_invest')
+                            ])
+                        ], color='primary', inverse=True),
+                        dbc.Card([
+                            dbc.Container([
+                                html.H2('ROI'),
+                                html.H3("",id='proj_roi')
+                            ])
+                        ], color='primary', inverse=True)
+                    ])
+                ])
+            ])
+        ]),
+        dbc.Row([
+            dbc.Col([
+                dbc.Container([
+                    html.Hr()
+                ])
+            ])
+        ]),
+        dbc.Row([
+            dbc.Col([
+                dbc.Container([
+                    html.H1('Projected Condensed Income Statement'),
+                    html.Hr()
+                ])
+            ])
+        ]),
+        dbc.Row([
+            dbc.Col([
+                dbc.Container([
+                    dbc.RadioItems(
+                        options=[
+                            {"label": "Yearly", "value": 'year'},
+                            {"label": "Quarterly", "value": 'quarter'}
+                        ],
+                        value='year',
+                        id='table_time_select',
+                        persistence=True,
+                        persistence_type='session',
+                        inline=True
+                    )
+                ])
+            ])
+        ]),
+        dbc.Row([dbc.Col([dbc.Container([], id='proj')],width=12)])
     ], label='Projected Financials', tab_id='proj'),
     dbc.Tab([
         dbc.Container([
@@ -656,7 +705,41 @@ app.layout = dbc.Tabs([
                 sort_action='native'
             )
         ])
-    ], label='Current Sourced Opportunities', tab_id='opp')
+    ], label='Current Sourced Opportunities', tab_id='opp'),
+    dbc.Tab([
+        dbc.Container([
+            dbc.Row([
+                dbc.Col([
+                    html.H1('Metric Growth'),
+                    html.Hr()
+                ])
+            ]),
+            dbc.Row([
+                dbc.Col([
+                    dbc.Container([
+                        dcc.Graph(id='revenue')
+                    ])
+                ]),
+                dbc.Col([
+                    dbc.Container([
+                        dcc.Graph(id='ebitda')
+                    ])
+                ])
+            ]),
+            dbc.Row([
+                dbc.Col([
+                    dbc.Container([
+                        dcc.Graph(id='gross_margin')
+                    ])
+                ]),
+                dbc.Col([
+                    dbc.Container([
+                        dcc.Graph(id='total_cabinets')
+                    ])
+                ])
+            ])
+        ])
+    ], label='Metrics Over Time')
 ], id='tabs', active_tab='input')
 
 all_states = []
@@ -689,6 +772,46 @@ for x in range(10):
     all_collapse_opens.append(create_collapse_opens(x))
 #Change the graph
 
+@app.callback([Output('revenue', 'figure'),
+               Output('ebitda', 'figure'),
+               Output('gross_margin', 'figure'),
+               Output('total_cabinets', 'figure')],
+              [Input('intermediate-value', 'children')])
+
+def update_graphs(json):
+    df = pd.read_json(json, convert_dates=False, convert_axes=False)
+    revenue = df.loc['Total Revenue']
+    ebitda = df.loc['EBITDA']
+    margin = (df.loc['Total Revenue']-df.loc['Total Costs'])/df.loc['Total Revenue']
+    total_cabinets = df.loc['Quarterly Effective Cabinets']
+    x = list(df.columns)
+
+    fig_rev = go.Figure(go.Bar(x=x, y=revenue))
+    fig_rev.update_layout(
+        title=dict(text='Quarterly Revenue'),
+        font=dict(family='gotham')
+    )
+
+    fig_ebitda = go.Figure(go.Bar(x=x, y=ebitda))
+    fig_ebitda.update_layout(
+        title=dict(text='Quarterly EBITDA'),
+        font=dict(family='gotham')
+    )
+
+    fig_margin = go.Figure(go.Bar(x=x, y=margin))
+    fig_margin.update_layout(
+        title=dict(text='Quarterly Gross Margin'),
+        font=dict(family='gotham')
+    )
+
+    fig_cabinets = go.Figure(go.Bar(x=x, y=total_cabinets))
+    fig_cabinets.update_layout(
+        title=dict(text='Total Cabinets Over Time'),
+        font=dict(family='gotham')
+    )
+
+    return fig_rev, fig_ebitda, fig_margin, fig_cabinets
+
 @app.callback(Output('plus', 'n_clicks'),
               all_remove_inputs)
 def reset(*args):
@@ -704,7 +827,6 @@ def change(*args):
     n = args[0]
     current = args[-1]
     remove = args[1:-1]
-    print(args)
     if n:
         current = list(current)
         current.sort()
@@ -876,6 +998,8 @@ def update_value(json):
     sum = sum+tv
 
     roi = sum/invest
+    roi = roi*-1
+    invest = invest*-1
 
     value_form = f'${round(sum/1000000,1)}M'
     value_string = "Valuation: {0}".format(value_form)
@@ -887,24 +1011,48 @@ def update_value(json):
     return value_string, value_form, invest_form, roi_form
 
 @app.callback(Output('proj', 'children'),
-              [Input('intermediate-value','children')]
+              [Input('intermediate-value','children'),
+               Input('table_time_select', 'value')]
 )
-def run_graph(json):
+def run_graph(json, time):
     current_df = pd.read_json(json, convert_dates=False, convert_axes=False)
     current_df = current_df.round(0)
     #ind = list(current_df.index)[2:]
+    if time=='quarter':
+        dt = dash_table.DataTable(
+            id='table',
+            style_cell={
+                'whiteSpace': 'normal',
+                'height': 'auto',
+            },
+            columns = [{"name":'', "id":'index'}]+[{"name":i, "id":i, "type":'numeric', 'format': Format(group=',')} for i in list(current_df.reset_index().columns)[1:]],
+            data = current_df.reset_index().to_dict(orient='records'),
 
-    dt = dash_table.DataTable(
-        id='table',
-        style_cell={
-            'whiteSpace': 'normal',
-            'height': 'auto',
-        },
-        columns = [{"name":'', "id":'index'}]+[{"name":i, "id":i, "type":'numeric', 'format': Format(group=',')} for i in list(current_df.reset_index().columns)[1:]],
-        data = current_df.reset_index().to_dict(orient='records'),
+        )
+        return dt
+    elif time=='year':
+        arr = current_df.values
+        l = []
+        l.append(arr[:,0])
+        for x in range(5):
+            start = x*4+1
+            end = (x+1)*4+1
+            l.append(arr[:,start:end].sum(axis=1))
+        n_df = pd.DataFrame(l)
+        n_df = n_df.transpose()
+        n_df.columns = [2020,2021,2022,2023,2024,2025]
+        n_df.index = current_df.index
+        dt = dash_table.DataTable(
+            id='table',
+            style_cell={
+                'whiteSpace': 'normal',
+                'height': 'auto',
+            },
+            columns=[{"name": '', "id": 'index'}] + [{"name": str(i), "id": str(i), "type": 'numeric', 'format': Format(group=',')} for i in list(n_df.reset_index().columns)[1:]],
+            data=n_df.reset_index().to_dict(orient='records'),
 
-    )
-    return dt
+        )
+        return dt
 
 @app.callback(
     Output("collapse_0", "is_open"),
