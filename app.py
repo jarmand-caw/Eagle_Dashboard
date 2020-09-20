@@ -3,7 +3,6 @@ import dash_core_components as dcc
 import dash_html_components as html
 import plotly.graph_objects as go
 import dash_table
-import dash_table.FormatTemplate as FormatTemplate
 from dash_table.Format import Format
 import pandas as pd
 import dash_bootstrap_components as dbc
@@ -11,7 +10,6 @@ from dash.dependencies import Input, Output, State
 import dash_auth
 import numpy as np
 import warnings
-from sklearn.linear_model import LinearRegression
 
 warnings.simplefilter('ignore')
 
@@ -693,53 +691,56 @@ app.layout = dbc.Tabs([
     ], label='Projected Financials', tab_id='proj'),
     dbc.Tab([
         dbc.Container([
-            dash_table.DataTable(
-                id='table',
-                style_cell={
-                    'whiteSpace': 'normal',
-                    'height': 'auto',
-                },
-                columns = [{"name":i, "id":i} for i in list(opp_df.columns)],
-                data = opp_df.to_dict(orient='records'),
-                filter_action='native',
-                sort_action='native'
-            )
-        ])
-    ], label='Current Sourced Opportunities', tab_id='opp'),
-    dbc.Tab([
-        dbc.Container([
             dbc.Row([
                 dbc.Col([
-                    html.H1('Metric Growth'),
+                    html.H1('Financial and KPI Metrics QoQ'),
                     html.Hr()
                 ])
             ]),
             dbc.Row([
                 dbc.Col([
-                    dbc.Container([
-                        dcc.Graph(id='revenue')
-                    ])
+                    dcc.Graph(id='revenue')
                 ]),
                 dbc.Col([
-                    dbc.Container([
-                        dcc.Graph(id='ebitda')
-                    ])
+                    dcc.Graph(id='ebitda')
                 ])
             ]),
             dbc.Row([
                 dbc.Col([
-                    dbc.Container([
-                        dcc.Graph(id='gross_margin')
-                    ])
+                    dcc.Graph(id='gross_margin')
                 ]),
                 dbc.Col([
-                    dbc.Container([
-                        dcc.Graph(id='total_cabinets')
-                    ])
+                    dcc.Graph(id='total_cabinets')
                 ])
             ])
         ])
-    ], label='Metrics Over Time')
+    ], label='Metrics Over Time'),
+    dbc.Tab([
+        dbc.Container([
+            dbc.Row([
+                dbc.Col([
+                    html.H1('Sourced Potential Opportunities'),
+                    html.H5('Data centers that we have some amount of information on, fit our criteria, and are potentially considering a sale'),
+                    html.Hr()
+                ])
+            ]),
+            dbc.Row([
+                dbc.Col([
+                    dash_table.DataTable(
+                        id='table',
+                        style_cell={
+                            'whiteSpace': 'normal',
+                            'height': 'auto',
+                        },
+                        columns = [{"name":i, "id":i} for i in list(opp_df.columns)],
+                        data = opp_df.to_dict(orient='records'),
+                        filter_action='native',
+                        sort_action='native'
+                    )
+                ])
+            ])
+        ])
+    ], label='Current Sourced Opportunities', tab_id='opp'),
 ], id='tabs', active_tab='input')
 
 all_states = []
@@ -786,25 +787,25 @@ def update_graphs(json):
     total_cabinets = df.loc['Quarterly Effective Cabinets']
     x = list(df.columns)
 
-    fig_rev = go.Figure(go.Bar(x=x, y=revenue))
+    fig_rev = go.Figure(go.Bar(x=x, y=revenue, marker_color='#2C3F51'))
     fig_rev.update_layout(
         title=dict(text='Quarterly Revenue'),
         font=dict(family='gotham')
     )
 
-    fig_ebitda = go.Figure(go.Bar(x=x, y=ebitda))
+    fig_ebitda = go.Figure(go.Bar(x=x, y=ebitda, marker_color='#18BC9C'))
     fig_ebitda.update_layout(
         title=dict(text='Quarterly EBITDA'),
         font=dict(family='gotham')
     )
 
-    fig_margin = go.Figure(go.Bar(x=x, y=margin))
+    fig_margin = go.Figure(go.Bar(x=x, y=margin, marker_color='#8D91C7'))
     fig_margin.update_layout(
         title=dict(text='Quarterly Gross Margin'),
         font=dict(family='gotham')
     )
 
-    fig_cabinets = go.Figure(go.Bar(x=x, y=total_cabinets))
+    fig_cabinets = go.Figure(go.Bar(x=x, y=total_cabinets, marker_color='#EF476F'))
     fig_cabinets.update_layout(
         title=dict(text='Total Cabinets Over Time'),
         font=dict(family='gotham')
