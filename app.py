@@ -176,8 +176,22 @@ class DataCenter:
         self.df = pd.DataFrame({
             'New Cabinets': [round(x, 0) for x in list(self.quarterly_new_cabinets)],
             'Quarterly Effective Cabinets': list(self.quarterly_effective_cabinets),
+            'Revenue':[None for x in range(len(list(self.quarterly_effective_cabinets)))],
+            'Space Revenue':list(self.space_revenue),
+            'Power Revenue':list(self.power_revenue),
+            'Cross Connect Revenue':list(self.cross_connect_revenue),
+            'Install Revenue':list(self.install_revenue),
+            'Professional Service Revenue':list(self.professional_service_revenue),
             'Total Revenue': list(self.total_revenue),
-            'Total Costs': list(self.total_direct_costs),
+            'Direct Costs': [None for x in range(len(list(self.quarterly_effective_cabinets)))],
+            'Rent': list([self.rent_cost]*len(self.quarterly_effective_cabinets)),
+            'Utilities':list(self.utilities),
+            'Maintenance':list([self.maintenance]*len(self.quarterly_effective_cabinets)),
+            'R&M':list([self.rm]*len(self.quarterly_effective_cabinets)),
+            'Property Tax':list([self.property_tax]*len(self.quarterly_effective_cabinets)),
+            'Cross Connect Expense':list(self.cross_connect_expense),
+            'Conduit Expense':list(self.conduit_expense),
+            'Total Direct Costs': list(self.total_direct_costs),
             'OPEX': list(self.operating_expenses),
             'EBITDA': list(self.ebitda)
         }).transpose()
@@ -783,7 +797,7 @@ def update_graphs(json):
     df = pd.read_json(json, convert_dates=False, convert_axes=False)
     revenue = df.loc['Total Revenue']
     ebitda = df.loc['EBITDA']
-    margin = (df.loc['Total Revenue']-df.loc['Total Costs'])/df.loc['Total Revenue']
+    margin = (df.loc['Total Revenue']-df.loc['Total Direct Costs'])/df.loc['Total Revenue']
     total_cabinets = df.loc['Quarterly Effective Cabinets']
     x = list(df.columns)
 
@@ -982,7 +996,7 @@ def update_df(*args):
               [Input('intermediate-value','children')])
 def update_value(json):
     df = pd.read_json(json, convert_dates=False, convert_axes=False)
-    df = df.astype(int)
+    df = df.astype(float)
     a = df.loc['EBITDA'].values
     cumsum = np.cumsum(a)
     invest = cumsum.min()
@@ -1026,8 +1040,40 @@ def run_graph(json, time):
                 'whiteSpace': 'normal',
                 'height': 'auto',
             },
-            columns = [{"name":'', "id":'index'}]+[{"name":i, "id":i, "type":'numeric', 'format': Format(group=',')} for i in list(current_df.reset_index().columns)[1:]],
+            columns = [{"name":'', "id":'index'}]+[{"name":i, "id":i, "type":'numeric', 'format': Format(group=',')} for i in list(current_df.reset_index().columns)[1:-1]],
             data = current_df.reset_index().to_dict(orient='records'),
+            style_cell_conditional=[
+                {
+                    'if': {'row_index': 2},
+                    'textAlign':'left',
+                    'fontWeight':'bold'
+                },
+                {
+                    'if':{'row_index':8},
+                    'backgroundColor':'rgb(230,230,230)',
+                    'fontWeight':'bold'
+                },
+                {
+                    'if': {'row_index': 9},
+                    'textAlign': 'left',
+                    'fontWeight': 'bold'
+                },
+                {
+                    'if': {'row_index': 17},
+                    'backgroundColor': 'rgb(230,230,230)',
+                    'fontWeight': 'bold'
+                },
+                {
+                    'if': {'row_index': 18},
+                    'backgroundColor': 'rgb(230,230,230)',
+                    'fontWeight': 'bold'
+                },
+                {
+                    'if': {'row_index': 19},
+                    'backgroundColor': 'rgb(230,230,230)',
+                    'fontWeight': 'bold'
+                },
+            ]
 
         )
         return dt
@@ -1051,6 +1097,38 @@ def run_graph(json, time):
             },
             columns=[{"name": '', "id": 'index'}] + [{"name": str(i), "id": str(i), "type": 'numeric', 'format': Format(group=',')} for i in list(n_df.reset_index().columns)[1:]],
             data=n_df.reset_index().to_dict(orient='records'),
+            style_cell_conditional=[
+                {
+                    'if': {'row_index': 2},
+                    'textAlign': 'left',
+                    'fontWeight': 'bold'
+                },
+                {
+                    'if': {'row_index': 8},
+                    'backgroundColor': 'rgb(230,230,230)',
+                    'fontWeight': 'bold'
+                },
+                {
+                    'if': {'row_index': 9},
+                    'textAlign': 'left',
+                    'fontWeight': 'bold'
+                },
+                {
+                    'if': {'row_index': 17},
+                    'backgroundColor': 'rgb(230,230,230)',
+                    'fontWeight': 'bold'
+                },
+                {
+                    'if': {'row_index': 18},
+                    'backgroundColor': 'rgb(230,230,230)',
+                    'fontWeight': 'bold'
+                },
+                {
+                    'if': {'row_index': 19},
+                    'backgroundColor': 'rgb(230,230,230)',
+                    'fontWeight': 'bold'
+                },
+            ]
 
         )
         return dt
@@ -1195,4 +1273,4 @@ def toggle_collapse(n, is_open):
 
 
 if __name__ == '__main__':
-    app.run_server(debug=True)
+    app.run_server(debug=False)
