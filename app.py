@@ -1088,7 +1088,13 @@ def run_graph(json, time):
         n_df = pd.DataFrame(l)
         n_df = n_df.transpose()
         n_df.columns = [2020,2021,2022,2023,2024,2025]
+        qef = current_df.loc['Quarterly Effective Cabinets'].values
+        real_qef = []
+        for x in range(6):
+            i = x*4
+            real_qef.append(qef[i])
         n_df.index = current_df.index
+        n_df.loc['Quarterly Effective Cabinets'] = real_qef
         dt = dash_table.DataTable(
             id='table',
             style_cell={
