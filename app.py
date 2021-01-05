@@ -227,11 +227,6 @@ VALID_USERNAME_PASSWORD_PAIRS = {
 
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.FLATLY])
 
-auth = dash_auth.BasicAuth(
-    app,
-    VALID_USERNAME_PASSWORD_PAIRS
-)
-
 server = app.server
 quarters = []
 for x in range(20):
