@@ -6,6 +6,3 @@ Deployed dashboard can be found at:
 
 https://hawkwood-eagle-dashboard.herokuapp.com 
 
-Username: HawkWoodGroup
-
-Password: project_eagle
